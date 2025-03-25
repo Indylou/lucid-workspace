@@ -1,46 +1,159 @@
-# Getting Started with Create React App
+# Lucid Team
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern React application with a beautiful UI built using Radix UI primitives and Tailwind CSS.
 
-## Available Scripts
+![Lucid Team](https://via.placeholder.com/800x400?text=Lucid+Team)
 
-In the project directory, you can run:
+## Overview
 
-### `npm start`
+Lucid Team is a dashboard application providing a clean, accessible, and customizable user interface. It features a purple-themed design system with both light and dark mode support.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Technologies
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- **React**: UI library
+- **TypeScript**: Type-safe JavaScript
+- **Tailwind CSS**: Utility-first CSS framework
+- **Radix UI**: Unstyled, accessible UI primitives
+- **Lucide React**: Beautiful icons
 
-### `npm test`
+## Getting Started
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Prerequisites
 
-### `npm run build`
+- Node.js (v18+)
+- npm or yarn
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Installation
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/lucid-team.git
+cd lucid-team
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+# Install dependencies
+npm install
+```
 
-### `npm run eject`
+### Development
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```bash
+# Start the development server
+npm start
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+# Build for production
+npm run build
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+## UI Component Guidelines
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+### Using UI Components
 
-## Learn More
+Our UI components are built with Radix UI primitives and styled with Tailwind CSS. They follow these patterns:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+1. **Direct Import Method**: You can directly import Radix UI primitives
+   ```tsx
+   import { Tabs, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
+   ```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+2. **Shadcn-like Wrapper Method**: Use our pre-styled components
+   ```tsx
+   import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
+   ```
+
+### Component Rules
+
+1. **Always use the "use client" directive** at the top of component files for React Server Components compatibility.
+
+2. **Export named components** rather than default exports to maintain consistency.
+
+3. **Use the `cn()` utility** for combining class names:
+   ```tsx
+   import { cn } from "../lib/utils";
+   
+   <div className={cn("base-class", condition && "conditional-class", className)}>
+   ```
+
+4. **Maintain proper TypeScript interfaces** for component props:
+   ```tsx
+   interface ButtonProps 
+     extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+       VariantProps<typeof buttonVariants> {
+     asChild?: boolean
+   }
+   ```
+
+5. **Use the correct ref forwarding pattern**:
+   ```tsx
+   const Component = React.forwardRef<HTMLElementType, ComponentProps>(
+     ({ className, ...props }, ref) => {
+       return <Element ref={ref} className={cn("classes", className)} {...props} />
+     }
+   )
+   Component.displayName = "Component"
+   ```
+
+### Theme
+
+We use a custom color theme defined in CSS variables. The primary color is a beautiful purple shade with carefully selected supporting colors.
+
+Access theme colors in Tailwind using:
+```css
+className="bg-primary text-primary-foreground"
+```
+
+Data visualization charts use our special chart color palette:
+```css
+className="fill-chart-1 stroke-chart-2"
+```
+
+### Dark Mode
+
+Our application supports dark mode through the `.dark` class and CSS variables. Toggle it with a dark mode switcher component.
+
+## Project Structure
+
+```
+src/
+├── components/        # UI components
+│   ├── ui/            # Base UI components
+│   └── dashboard/     # Dashboard-specific components
+├── lib/               # Utility functions
+├── styles/            # Global styles
+│   └── globals.css    # Global CSS and theme variables
+├── App.tsx            # Main application component
+└── index.tsx          # Application entry point
+```
+
+## Best Practices
+
+1. **Keep components small and focused** on a single responsibility.
+
+2. **Use composition** over inheritance for component flexibility.
+
+3. **Maintain accessibility** by leveraging Radix UI's built-in accessibility features.
+
+4. **Follow naming conventions**:
+   - Component files: PascalCase.tsx
+   - Utility files: camelCase.ts
+   - CSS files: kebab-case.css
+
+5. **Document complex components** with JSDoc comments.
+
+6. **Test UI components** thoroughly for functionality and accessibility.
+
+## Troubleshooting
+
+### Common Issues
+
+- **Cannot find module '@radix-ui/...'**: Ensure you've installed all Radix UI dependencies.
+  ```bash
+  npm install @radix-ui/react-[component-name]
+  ```
+
+- **Styling issues**: Make sure Tailwind is properly configured and processing your CSS.
+
+- **Type errors**: Check that you're using proper TypeScript interfaces for your components.
+
+## License
+
+MIT
