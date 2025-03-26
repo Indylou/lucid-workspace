@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import { useEditor, EditorContent, Editor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
+import { StarterKit } from '@tiptap/starter-kit'
+import { Extension } from '@tiptap/core'
 import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import Underline from '@tiptap/extension-underline'
@@ -170,7 +171,8 @@ export const TiptapEditor = React.forwardRef<HTMLDivElement, TiptapEditorProps>(
             keepMarks: true,
             keepAttributes: true,
           },
-        }),
+          horizontalRule: false,
+        }) as Extension,
         Image,
         Link.configure({
           openOnClick: false,

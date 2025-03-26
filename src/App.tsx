@@ -1,47 +1,138 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { LoginForm } from './components/auth/LoginForm';
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
-import TiptapPage from './pages/tiptap';
-import TiptapEnhancedPage from './pages/tiptap-enhanced';
+import TodoEditorPage from './pages/TodoEditorPage';
+import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
+import { checkAuth, AuthState } from './lib/auth-service';
+import { User } from './lib/supabase';
+import { AppError, handleAuthError } from './lib/error-handling';
+import { ToastProvider } from './components/ui/use-toast';
+import { UserProvider } from './components/UserProvider';
+import { useUser } from './lib/user-context';
+import { TodoProvider } from './features/todos/hooks';
 import './App.css';
 
+// Create auth context
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+  error: AppError | null;
+  refreshAuth: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  error: null,
+  refreshAuth: async () => {},
+});
+
+// Auth provider component
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null,
+    loading: true,
+    error: null,
+  });
+  const { setUser } = useUser();
+
+  const refreshAuth = async () => {
+    try {
+      setAuthState(prev => ({ ...prev, loading: true, error: null }));
+      const { user, error } = await checkAuth();
+      console.log('[AuthProvider] Auth state updated:', { userId: user?.id });
+      setAuthState({ user, loading: false, error });
+      // Sync with UserContext
+      console.log('[AuthProvider] Syncing with UserContext:', { userId: user?.id });
+      setUser(user);
+    } catch (error) {
+      console.error('[AuthProvider] Auth error:', error);
+      setAuthState({ 
+        user: null, 
+        loading: false, 
+        error: handleAuthError('Failed to authenticate') 
+      });
+      // Sync with UserContext on error
+      setUser(null);
+    }
+  };
+
+  // Check auth on mount
+  useEffect(() => {
+    console.log('[AuthProvider] Initial auth check');
+    refreshAuth();
+  }, [refreshAuth]);
+
+  return (
+    <AuthContext.Provider value={{ ...authState, refreshAuth }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Hook to use auth context
+export const useAuth = () => useContext(AuthContext);
+
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const location = useLocation();
 
-  // We wrap LoginForm to handle the login state
-  const LoginFormWithState = () => {
-    const handleLogin = (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsLoggedIn(true);
-    };
+  return (
+    <ToastProvider>
+      <UserProvider>
+        <AuthProvider>
+          <TodoProvider>
+            <AppRoutes location={location} />
+          </TodoProvider>
+        </AuthProvider>
+      </UserProvider>
+    </ToastProvider>
+  );
+}
 
-    return (
-      <div onClick={handleLogin} className="cursor-pointer">
-        <LoginForm />
-      </div>
-    );
-  };
+// Separate component for routes to access auth context
+function AppRoutes({ location }: { location: ReturnType<typeof useLocation> }) {
+  const { user: authUser, loading } = useAuth();
+  const { user: activeUser } = useUser();
+  const user = activeUser || authUser; // Prefer active user from context
 
   // A wrapper component that checks if the user is authenticated
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-    if (!isLoggedIn) {
-      // Redirect to login page with the return url
-      return <Navigate to="/" state={{ from: location }} replace />;
+    if (loading) {
+      return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
     }
+    
+    if (!user) {
+      // Redirect to login page with the return url
+      return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+    
     return <>{children}</>;
   };
 
-  // If the user is logged in and tries to access the root path, redirect to the dashboard
-  if (isLoggedIn && location.pathname === '/') {
+  // If the user is logged in and tries to access login/register pages, redirect to dashboard
+  if (user && (location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/')) {
     return <Navigate to="/dashboard" replace />;
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Routes>
-        <Route path="/" element={!isLoggedIn ? <LoginFormWithState /> : <Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        
+        {/* Todo page for testing the structured content */}
+        <Route 
+          path="/todos" 
+          element={
+            <ProtectedRoute>
+              <TodoEditorPage />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Dashboard and Documents routes all use the same DashboardLayout component */}
         <Route 
           path="/dashboard" 
           element={
@@ -51,18 +142,48 @@ function App() {
           } 
         />
         <Route 
-          path="/tiptap" 
+          path="/documents" 
           element={
             <ProtectedRoute>
-              <TiptapPage />
+              <DashboardLayout />
             </ProtectedRoute>
           } 
         />
         <Route 
-          path="/tiptap-enhanced" 
+          path="/documents/:documentId" 
           element={
             <ProtectedRoute>
-              <TiptapEnhancedPage />
+              <DashboardLayout />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Tasks route */}
+        <Route 
+          path="/tasks" 
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Calendar route */}
+        <Route 
+          path="/calendar" 
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Analytics route */}
+        <Route 
+          path="/analytics" 
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
             </ProtectedRoute>
           } 
         />

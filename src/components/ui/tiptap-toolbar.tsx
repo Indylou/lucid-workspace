@@ -135,7 +135,7 @@ export function TiptapToolbar({ editor, className, onImageUpload }: TiptapToolba
   return (
     <div className={cn("flex flex-wrap gap-1 p-2 border-b", className)}>
       {/* Text formatting */}
-      <div className="flex gap-1">
+      <div className="toolbar-button-group">
         <Button
           type="button"
           variant="ghost"
@@ -168,7 +168,7 @@ export function TiptapToolbar({ editor, className, onImageUpload }: TiptapToolba
       <Separator orientation="vertical" className="h-8" />
 
       {/* Headings */}
-      <div className="flex gap-1">
+      <div className="toolbar-button-group">
         <Button
           type="button"
           variant="ghost"
@@ -201,7 +201,7 @@ export function TiptapToolbar({ editor, className, onImageUpload }: TiptapToolba
       <Separator orientation="vertical" className="h-8" />
 
       {/* Lists */}
-      <div className="flex gap-1">
+      <div className="toolbar-button-group">
         <Button
           type="button"
           variant="ghost"
@@ -225,7 +225,7 @@ export function TiptapToolbar({ editor, className, onImageUpload }: TiptapToolba
       <Separator orientation="vertical" className="h-8" />
 
       {/* Code and quote */}
-      <div className="flex gap-1">
+      <div className="toolbar-button-group">
         <Button
           type="button"
           variant="ghost"
@@ -297,128 +297,134 @@ export function TiptapToolbar({ editor, className, onImageUpload }: TiptapToolba
         </PopoverContent>
       </Popover>
 
-      {/* Image Upload */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={handleImageUpload}
-      >
-        <ImageIcon className="h-4 w-4" />
-      </Button>
+      {/* Image, Horizontal Rule, and Mention buttons */}
+      <div className="toolbar-button-group">
+        {/* Image Upload */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleImageUpload}
+        >
+          <ImageIcon className="h-4 w-4" />
+        </Button>
 
-      {/* Horizontal Rule */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-      >
-        <Minus className="h-4 w-4" />
-      </Button>
+        {/* Horizontal Rule */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => editor.chain().focus().setHorizontalRule().run()}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
 
-      {/* Mention */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={addMention}
-      >
-        <AtSign className="h-4 w-4" />
-      </Button>
+        {/* Mention */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={addMention}
+        >
+          <AtSign className="h-4 w-4" />
+        </Button>
+      </div>
 
       <Separator orientation="vertical" className="h-8" />
 
-      {/* Font family */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm">
-            <Type className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">Font</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-48 p-2">
-          <div className="flex flex-col space-y-1">
-            {fontFamilies.map((font) => (
-              <Button
-                key={font.value}
-                variant="ghost"
-                size="sm"
-                onClick={() => setFontFamily(font.value)}
-                className={cn(
-                  'justify-start',
-                  editor.isActive('textStyle', { fontFamily: font.value }) && 'bg-accent text-accent-foreground'
-                )}
-                style={{ fontFamily: font.value }}
-              >
-                {font.name}
-              </Button>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      {/* Color and highlight popover */}
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm">
-            <div 
-              className="h-4 w-4 rounded-full border"
-              style={{ 
-                backgroundColor: editor.getAttributes('textStyle').color || '#000000',
-              }}
-            />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-64 p-2">
-          <Tabs defaultValue="color">
-            <TabsList className="grid w-full grid-cols-2 mb-2">
-              <TabsTrigger value="color">Text Color</TabsTrigger>
-              <TabsTrigger value="highlight">Highlight</TabsTrigger>
-            </TabsList>
-            <TabsContent value="color" className="mt-0">
-              <div className="grid grid-cols-3 gap-1">
-                {colorOptions.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setColor(color.value)}
-                    className="w-8 h-8 rounded-full border"
-                    style={{ backgroundColor: color.value }}
-                    title={color.name}
-                  />
-                ))}
-              </div>
-            </TabsContent>
-            <TabsContent value="highlight" className="mt-0">
-              <div className="grid grid-cols-3 gap-1">
-                {highlightColors.map((color) => (
-                  <button
-                    key={color.value}
-                    onClick={() => setHighlight(color.value)}
-                    className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center"
-                    style={{ backgroundColor: color.value }}
-                    title={`Highlight ${color.name}`}
-                  >
-                    <Highlighter className="h-4 w-4 text-gray-600" />
-                  </button>
-                ))}
-                <button
-                  onClick={() => editor.chain().focus().unsetHighlight().run()}
-                  className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white"
-                  title="Remove highlight"
+      {/* Font family and color tools */}
+      <div className="toolbar-button-group">
+        {/* Font family */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <Type className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Font</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2">
+            <div className="flex flex-col space-y-1">
+              {fontFamilies.map((font) => (
+                <Button
+                  key={font.value}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFontFamily(font.value)}
+                  className={cn(
+                    'justify-start',
+                    editor.isActive('textStyle', { fontFamily: font.value }) && 'bg-accent text-accent-foreground'
+                  )}
+                  style={{ fontFamily: font.value }}
                 >
-                  <Highlighter className="h-4 w-4 text-gray-400" />
-                </button>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </PopoverContent>
-      </Popover>
+                  {font.name}
+                </Button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Color and highlight popover */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <div 
+                className="h-4 w-4 rounded-full border"
+                style={{ 
+                  backgroundColor: editor.getAttributes('textStyle').color || '#000000',
+                }}
+              />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-2">
+            <Tabs defaultValue="color">
+              <TabsList className="grid w-full grid-cols-2 mb-2">
+                <TabsTrigger value="color">Text Color</TabsTrigger>
+                <TabsTrigger value="highlight">Highlight</TabsTrigger>
+              </TabsList>
+              <TabsContent value="color" className="mt-0">
+                <div className="grid grid-cols-3 gap-1">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setColor(color.value)}
+                      className="w-8 h-8 rounded-full border"
+                      style={{ backgroundColor: color.value }}
+                      title={color.name}
+                    />
+                  ))}
+                </div>
+              </TabsContent>
+              <TabsContent value="highlight" className="mt-0">
+                <div className="grid grid-cols-3 gap-1">
+                  {highlightColors.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setHighlight(color.value)}
+                      className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center"
+                      style={{ backgroundColor: color.value }}
+                      title={`Highlight ${color.name}`}
+                    >
+                      <Highlighter className="h-4 w-4 text-gray-600" />
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => editor.chain().focus().unsetHighlight().run()}
+                    className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center bg-white"
+                    title="Remove highlight"
+                  >
+                    <Highlighter className="h-4 w-4 text-gray-400" />
+                  </button>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </PopoverContent>
+        </Popover>
+      </div>
 
       <Separator orientation="vertical" className="h-8" />
 
       {/* Undo/redo */}
-      <div className="flex gap-1">
+      <div className="toolbar-button-group">
         <Button
           type="button"
           variant="ghost"

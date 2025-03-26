@@ -1,71 +1,97 @@
-/* Tiptap Editor Styles */
-.tiptap-editor {
-  position: relative;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --background-lighter: 0 0% 100%;
+    
+    /* Adding purple as the primary color */
+    --primary: 265 89% 60%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 265 89% 97%;
+    --accent-foreground: 265 89% 40%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 265 89% 60%;
+    --radius: 0.5rem;
+    
+    /* Custom status colors */
+    --success: 142.1 76.2% 36.3%;
+    --warning: 38 92% 50%;
+    --info: 210 79% 46%;
+    --purple-light: 265 89% 92%;
+    --purple-medium: 265 89% 78%;
+    --purple-dark: 265 89% 40%;
+    
+    /* Chart colors */
+    --chart-1: 265 89% 60%;
+    --chart-2: 265 89% 78%;
+    --chart-3: 215.4 16.3% 46.9%;
+    --chart-4: 210 40% 96.1%;
+    --chart-5: 222.2 47.4% 11.2%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --background-lighter: 223 47% 11%;
+    
+    /* Adding purple as the primary color */
+    --primary: 265 89% 68%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 265 89% 20%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 265 89% 68%;
+    
+    /* Custom status colors */
+    --success: 142.1 76.2% 42%;
+    --warning: 38 92% 55%;
+    --info: 210 79% 55%;
+    --purple-light: 265 89% 30%;
+    --purple-medium: 265 89% 50%;
+    --purple-dark: 265 89% 70%;
+    
+    /* Chart colors */
+    --chart-1: 265 89% 68%;
+    --chart-2: 265 89% 40%;
+    --chart-3: 215 20.2% 65.1%;
+    --chart-4: 217.2 32.6% 17.5%;
+    --chart-5: 210 40% 98%;
+  }
 }
 
-.tiptap-editor .ProseMirror {
-  min-height: 200px;
-  padding: 1rem;
-  outline: none;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }
-
-.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: #adb5bd;
-  pointer-events: none;
-  height: 0;
-}
-
-.tiptap-editor .ProseMirror img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 1rem 0;
-}
-
-.tiptap-editor .ProseMirror hr {
-  border: none;
-  border-top: 2px solid #e5e7eb;
-  margin: 2rem 0;
-}
-
-.tiptap-editor .ProseMirror blockquote {
-  border-left: 4px solid #e5e7eb;
-  margin-left: 0;
-  padding-left: 1rem;
-  font-style: italic;
-  color: #6b7280;
-}
-
-.tiptap-editor .ProseMirror pre {
-  background-color: #f3f4f6;
-  border-radius: 0.375rem;
-  padding: 0.75rem 1rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  font-size: 0.875rem;
-  line-height: 1.5;
-  overflow-x: auto;
-}
-
-.tiptap-editor .ProseMirror ul,
-.tiptap-editor .ProseMirror ol {
-  padding-left: 1.5rem;
-}
-
-.tiptap-editor .ProseMirror li {
-  margin-bottom: 0.25rem;
-}
-
-.tiptap-editor .ProseMirror li > p {
-  margin: 0;
-}
-
-.tiptap-editor .mention {
-  color: #6366f1;
-  font-weight: 500;
-  background-color: rgba(99, 102, 241, 0.1);
-  border-radius: 0.25rem;
-  padding: 0.125rem 0.25rem;
-  white-space: nowrap;
-} 

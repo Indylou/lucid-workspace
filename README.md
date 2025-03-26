@@ -1,20 +1,71 @@
 # Lucid Team
 
-A modern React application with a beautiful UI built using Radix UI primitives and Tailwind CSS.
+A modern document collaboration platform with embedded todos, project management, and team coordination features.
 
-![Lucid Team](https://via.placeholder.com/800x400?text=Lucid+Team)
+## Project Structure
+
+```
+src/
+├── components/        # Shared UI components
+│   ├── ui/            # Base UI components (from shadcn/ui)
+│   ├── dashboard/     # Dashboard-specific components
+│   └── tiptap/        # Rich text editor components
+├── features/          # Feature-based modules
+│   └── todos/         # Todo feature
+│       ├── components/  # Todo-related components
+│       ├── hooks/       # Todo hooks and context
+│       ├── lib/         # Todo extensions and services
+│       └── utils/       # Todo utilities
+├── lib/               # Shared utilities and services
+├── pages/             # Main application pages
+└── styles/            # Global styles
+```
+
+## Features
+
+- Rich text editing with embedded todo items
+- Task management with due dates and assignees
+- Project organization and collaboration
+- Dashboard with analytics and activity tracking
+
+## Todo Feature Organization
+
+The Todo feature is organized into a cohesive module structure:
+
+- **Components**: UI components for displaying and interacting with todos
+  - `TodoItems.tsx`: Combined todo item components (simple and enhanced)
+  - `TodoEditor.tsx`: Editor for creating/editing todos
+  - `todo-enabled-editor.tsx`: Rich text editor with todo support
+  - `todo-toolbar.tsx`: Toolbar for todo operations
+
+- **Lib**: Extensions and services for todos
+  - `todo-extensions.ts`: Combined TipTap extensions for todos
+  - `todo-service.ts`: API services for todo CRUD operations
+
+- **Hooks**: State management
+  - `todo-context.tsx`: Context provider for todos
+
+## Technologies
+
+- React
+- TypeScript
+- TipTap rich text editor
+- Supabase (authentication and database)
+- Shadcn UI components
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+```
 
 ## Overview
 
 Lucid Team is a dashboard application providing a clean, accessible, and customizable user interface. It features a purple-themed design system with both light and dark mode support.
-
-## Technologies
-
-- **React**: UI library
-- **TypeScript**: Type-safe JavaScript
-- **Tailwind CSS**: Utility-first CSS framework
-- **Radix UI**: Unstyled, accessible UI primitives
-- **Lucide React**: Beautiful icons
 
 ## Getting Started
 
@@ -110,20 +161,6 @@ className="fill-chart-1 stroke-chart-2"
 
 Our application supports dark mode through the `.dark` class and CSS variables. Toggle it with a dark mode switcher component.
 
-## Project Structure
-
-```
-src/
-├── components/        # UI components
-│   ├── ui/            # Base UI components
-│   └── dashboard/     # Dashboard-specific components
-├── lib/               # Utility functions
-├── styles/            # Global styles
-│   └── globals.css    # Global CSS and theme variables
-├── App.tsx            # Main application component
-└── index.tsx          # Application entry point
-```
-
 ## Best Practices
 
 1. **Keep components small and focused** on a single responsibility.
@@ -157,3 +194,102 @@ src/
 ## License
 
 MIT
+
+## Setup
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Configure Supabase:
+   - Create a new project at [Supabase](https://supabase.com)
+   - Copy your project URL and anon key from the project settings
+   - Create a `.env` file in the root directory with:
+   ```
+   REACT_APP_SUPABASE_URL=your_project_url
+   REACT_APP_SUPABASE_ANON_KEY=your_anon_key
+   ```
+
+3. Start the development server:
+```bash
+npm start
+```
+
+## Features
+
+- Rich text editing with Tiptap
+- Task management with checkboxes
+- User mentions with @username
+- Real-time collaboration
+- Project organization
+
+## Development
+
+See [README-DEV.md](./README-DEV.md) for detailed development instructions.
+
+## Enhanced Todo Functionality
+
+The Todo functionality has been redesigned to be more flexible, customizable, and better integrated with the TipTap editor. Key improvements include:
+
+### Custom Todo Node Extension
+
+- Implemented a dedicated `TodoExtension` that supports rich metadata (ID, completion status, due date, assignments, etc.)
+- Added support for custom rendering of todo items using ReactNodeViewRenderer
+- Added callbacks for todo item updates to sync with external systems
+
+### NodeView Based Rendering
+
+- Created a `TodoNodeView` component that provides a rich UI for todo items in the editor
+- Support for displaying assignees, due dates, and project associations
+- Automatic styling for overdue items
+
+### Improved Data Synchronization
+
+- Real-time synchronization between editor state and database
+- Bidirectional updates: changes in external task lists reflect in the editor and vice versa
+- Optimized database operations with debounced updates
+
+### Enhanced User Experience
+
+- Added toolbar controls for todo creation, assignment, and due date setting
+- Implemented context-aware toolbar that only shows relevant actions based on cursor position
+- Keyboard shortcuts for quick todo creation and management
+
+### Using the Todo Functionality
+
+To add a todo in your document:
+
+1. Click the todo button in the toolbar or use the `/todo` command
+2. Type your todo content
+3. Optionally add:
+   - Due date by clicking the calendar icon
+   - Assignee by clicking the @mention button
+   - Project by using the project selector
+
+Todos are automatically synced with your database and can be viewed and managed in dedicated task list views.
+
+### Customization Options
+
+The todo system can be customized in several ways:
+
+```typescript
+// Configure the todo extension with custom options
+TodoExtension.configure({
+  HTMLAttributes: {
+    class: 'my-custom-todo-class',
+  },
+  onToggle: (id, completed) => {
+    // Custom callback when a todo is toggled
+    console.log(`Todo ${id} was ${completed ? 'completed' : 'reopened'}`);
+  },
+  onUpdate: (attrs) => {
+    // Custom callback when todo attributes are updated
+    console.log('Todo updated:', attrs);
+  },
+  renderNodeView: (props) => {
+    // Optional custom rendering for todo items
+    return <MyCustomTodoRenderer {...props} />;
+  }
+})
+```
