@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { supabase, Project } from '../../../lib/supabase';
 import { TodoItemAttributes } from '../lib/todo-service';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
@@ -70,13 +70,37 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   }, {} as Record<string, TodoItemAttributes[]>);
 
   // Fetch todos function
-  const fetchTodos = async () => {
+  const fetchTodos = useCallback(async () => {
     if (!user?.id) return;
     
     setLoading(true);
     setError(null);
     
     try {
+      // First, verify the user exists using the pattern from auth-service.ts
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (userError) {
+        console.error('[todo-context] Error verifying user:', userError);
+        throw handleSupabaseError(userError, ErrorType.DATA_FETCH);
+      }
+      
+      if (!existingUser) {
+        console.error('[todo-context] User not found with ID:', user.id);
+        setError({
+          type: ErrorType.DATA_FETCH,
+          message: 'User not found',
+          originalError: new Error('User not found')
+        });
+        setLoading(false);
+        return;
+      }
+      
+      // Now fetch the todos
       const { data, error } = await supabase
         .from('todos')
         .select('*')
@@ -92,13 +116,31 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   // Fetch projects function
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     if (!user?.id) return;
     
     try {
+      // First, verify the user exists using the pattern from auth-service.ts
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (userError) {
+        console.error('[todo-context] Error verifying user:', userError);
+        return; // Just return, no need to throw
+      }
+      
+      if (!existingUser) {
+        console.error('[todo-context] User not found with ID:', user.id);
+        return; // Just return, no need to throw
+      }
+      
+      // Now fetch the projects
       const { data, error } = await supabase
         .from('projects')
         .select('*')
@@ -112,7 +154,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Error fetching projects:', err);
     }
-  };
+  }, [user?.id]);
 
   // Create a new todo
   const createTodo = async (todoData: Omit<TodoItemAttributes, 'id' | 'createdAt'>, userId: string): Promise<TodoItemAttributes | null> => {
@@ -123,6 +165,26 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     console.log('[todo-context] Todo data:', todoData);
     
     try {
+      // First, look up the user directly using the working pattern from auth-service.ts
+      // This approach is working in the login functionality
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+        
+      if (userError) {
+        console.error('[todo-context] Error fetching user:', userError);
+        return null;
+      }
+      
+      if (!existingUser) {
+        console.error('[todo-context] User not found with ID:', userId);
+        return null;
+      }
+      
+      console.log('[todo-context] Successfully verified user exists');
+      
       const now = new Date().toISOString();
       
       // Insert with snake_case field names for database
@@ -161,7 +223,21 @@ export function TodoProvider({ children }: { children: ReactNode }) {
 
   // Update a todo
   const updateTodoAttributes = async (todoId: string, todoData: Partial<TodoItemAttributes>): Promise<TodoItemAttributes | null> => {
+    if (!user?.id) return null;
+    
     try {
+      // First, verify the user exists using the pattern from auth-service.ts
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (userError || !existingUser) {
+        console.error('[todo-context] User verification failed:', userError || 'User not found');
+        return null;
+      }
+      
       const updateData: Record<string, any> = {
         content: todoData.content,
         completed: todoData.completed,
@@ -203,7 +279,21 @@ export function TodoProvider({ children }: { children: ReactNode }) {
 
   // Delete a todo
   const deleteTodoById = async (todoId: string): Promise<boolean> => {
+    if (!user?.id) return false;
+    
     try {
+      // First, verify the user exists using the pattern from auth-service.ts
+      const { data: existingUser, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+        
+      if (userError || !existingUser) {
+        console.error('[todo-context] User verification failed:', userError || 'User not found');
+        return false;
+      }
+      
       const { error } = await supabase
         .from('todos')
         .delete()
@@ -243,7 +333,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
         clearTimeout(timer);
       };
     }
-  }, [user?.id]);
+  }, [user?.id, fetchTodos, fetchProjects]);
 
   // Add a throttled refresh function
   const lastRefreshRef = useRef<number>(0);

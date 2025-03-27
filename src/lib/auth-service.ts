@@ -332,8 +332,8 @@ export async function createUserRecord(user: { id: string, email: string, name?:
   }
   
   try {
-    // Insert into database using supabase with anon key
-    const { data, error } = await supabase
+    // Insert into database using adminSupabase with service role key
+    const { data, error } = await adminSupabase
       .from('users')
       .insert([userRecord])
       .select();

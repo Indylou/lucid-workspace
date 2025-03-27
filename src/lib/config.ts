@@ -31,8 +31,8 @@ interface Config {
 // Helper to get env variable with fallback
 function getEnv(key: string, fallback: string = ''): string {
   // For Vite/Create React App
-  if (typeof import.meta !== 'undefined' && 'env' in import.meta) {
-    const env = (import.meta as any).env;
+  if (typeof import.meta !== 'undefined') {
+    const { env = {} } = import.meta as any;
     return env[key] || fallback;
   }
   
