@@ -18,6 +18,16 @@
 .env.test.local
 .env.production.local
 
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+.env.staging
+
+# Keep the examples
+!.env.example
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

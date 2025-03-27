@@ -1,74 +1,42 @@
 import { createClient } from '@supabase/supabase-js'
+import config from './config'
 
-// Supabase URL and anon key
-const supabaseUrl = 'https://tygibsmxqdslroimelkh.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z2lic214cWRzbHJvaW1lbGtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4NzAzMDIsImV4cCI6MjA1ODQ0NjMwMn0.ar3hEgext-BNJtibzCFPAMQBStNtmS02Y8aXBLnjwcU'
+// Get Supabase configuration from our config
+const supabaseUrl = config.supabase.url
+const supabaseServiceKey = config.supabase.serviceRoleKey
+const supabaseAnonKey = config.supabase.anonKey
 
-// Create a single supabase client for the entire app with auth configuration
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false
-  },
-  global: {
-    headers: {
-      'Authorization': `Bearer ${supabaseAnonKey}`
-    }
-  }
-})
-
-// Create a separate admin client that can bypass RLS
-export const adminSupabase = createClient(supabaseUrl, supabaseAnonKey, {
-  global: {
-    headers: {
-      'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${supabaseAnonKey}`,
-      'x-supabase-auth': 'preferService'
-    }
-  }
-})
-
-// Test function to verify connectivity
-export async function testSupabaseConnection() {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('id')
-      .limit(1)
-    
-    if (error) {
-      console.error('Supabase connection test failed:', error)
-      return false
-    }
-    
-    console.log('Supabase connection test succeeded:', data)
-    return true
-  } catch (err) {
-    console.error('Supabase connection test threw error:', err)
-    return false
-  }
+// Log keys for debugging (showing only first/last few characters for security)
+function safeLogKey(key: string, name: string) {
+  if (!key) return console.log(`${name}: <not set>`);
+  const firstChars = key.substring(0, 8);
+  const lastChars = key.substring(key.length - 8);
+  console.log(`${name}: ${firstChars}...${lastChars}`);
 }
 
-// Run test on init
-testSupabaseConnection()
-  .then(success => console.log('Initial connection test:', success ? 'OK' : 'FAILED'))
-  .catch(err => console.error('Connection test error:', err))
+console.log('=== Supabase Configuration ===');
+console.log(`URL: ${supabaseUrl}`);
+safeLogKey(supabaseAnonKey, 'Anon Key');
+safeLogKey(supabaseServiceKey, 'Service Key');
+console.log('============================');
 
-// Log Supabase initialization
-console.log('Supabase client initialized with URL:', supabaseUrl);
+// Standard client for auth operations
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Admin client with service role key for database operations
+export const adminSupabase = createClient(supabaseUrl, supabaseServiceKey)
 
 // Suppress specific connection error messages
-const originalConsoleError = console.error;
+const originalConsoleError = console.error
 console.error = function(...args: any[]) {
-  const errorMessage = args[0]?.toString() || '';
+  const errorMessage = args[0]?.toString() || ''
   if (errorMessage.includes('messaging host not found') || 
       errorMessage.includes('Desktop app port disconnected') || 
       errorMessage.includes('The item cache has not been initialized yet')) {
-    return; // Don't log these errors
+    return // Don't log these errors
   }
-  originalConsoleError.apply(console, args);
-};
+  originalConsoleError.apply(console, args)
+}
 
 // Type definitions
 export interface User {

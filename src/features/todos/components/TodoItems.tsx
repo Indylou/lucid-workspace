@@ -24,8 +24,9 @@ import {
   SelectValue,
 } from '../../../components/ui/select';
 import { Calendar as CalendarComponent } from '../../../components/ui/calendar';
-import { updateTodo } from '../lib/todo-service';
+import { updateTodo, createTodo } from '../lib/todo-service';
 import { TodoAttributes } from '../lib/todo-extensions';
+import { useUser } from '../../../lib/user-context';
 
 // Simple TodoItem component for standalone usage
 export function TodoItem({ 

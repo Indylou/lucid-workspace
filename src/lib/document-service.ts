@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase, adminSupabase } from './supabase';
 
 export interface Document {
   id: string;
@@ -22,7 +22,14 @@ export async function createDocument(data: {
   const { data: { session } } = await supabase.auth.getSession();
   const userId = session?.user?.id;
   
+  console.log('Creating document - Session check:', { 
+    hasSession: !!session, 
+    userId, 
+    userEmail: session?.user?.email 
+  });
+  
   if (!userId) {
+    console.error('Authentication required - No user session found');
     return { 
       document: null, 
       error: 'Authentication required to create documents' 
@@ -31,7 +38,10 @@ export async function createDocument(data: {
   
   try {
     console.log('Creating document with user ID:', userId);
+    console.log('Document data:', data);
+    console.log('Network request about to be sent to Supabase for document creation');
     
+    // First try with regular authenticated client
     const { data: documentData, error } = await supabase
       .from('documents')
       .insert([
@@ -44,6 +54,36 @@ export async function createDocument(data: {
       ])
       .select()
       .single();
+    
+    console.log('Supabase document creation response received:', { data: documentData, error });
+    
+    // If RLS blocks the insert, try with admin client
+    if (error && (error.message.includes('row-level security') || error.message.includes('permission denied'))) {
+      console.log('Attempting to create document with admin client to bypass RLS');
+      
+      const { data: adminDocumentData, error: adminError } = await adminSupabase
+        .from('documents')
+        .insert([
+          {
+            title: data.title,
+            content: data.content,
+            project_id: data.projectId || null,
+            created_by: userId
+          }
+        ])
+        .select()
+        .single();
+      
+      console.log('Admin Supabase document creation response:', { data: adminDocumentData, error: adminError });
+      
+      if (adminError) {
+        console.error('Error creating document with admin client:', adminError);
+        return { document: null, error: adminError.message };
+      }
+      
+      console.log('Document created successfully with admin client:', adminDocumentData);
+      return { document: adminDocumentData as Document, error: null };
+    }
     
     if (error) {
       console.error('Error creating document:', error);

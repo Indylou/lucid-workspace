@@ -21,7 +21,7 @@ import {
 import { Label } from "../ui/label"
 import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../../App'
-import { User, Project, supabase } from '../../lib/supabase'
+import { supabase, User, Project, adminSupabase } from '../../lib/supabase'
 import {
   TodoItemAttributes,
   getUserTodos,
@@ -79,7 +79,7 @@ export function TasksModule() {
         }
         
         // Fetch users from Supabase
-        const { data: usersData, error: usersError } = await supabase
+        const { data: usersData, error: usersError } = await adminSupabase
           .from('users')
           .select('*');
           
@@ -245,7 +245,8 @@ export function TasksModule() {
         projectId: taskData.projectId,
         assignedTo: taskData.assignedTo,
         dueDate: taskData.dueDate,
-        completed: false
+        completed: false,
+        createdBy: user.id
       }, user.id);
       
       if (error) {

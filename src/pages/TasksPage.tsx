@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useTodos } from '../features/todos/hooks'
-import { supabase, User, Project } from '../lib/supabase'
+import { supabase, User, Project, adminSupabase } from '../lib/supabase'
 import { useUser } from '../lib/user-context'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -64,7 +64,7 @@ export default function TasksPage() {
         setProjects(projectsData || [])
         
         // Fetch users
-        const { data: usersData, error: usersError } = await supabase
+        const { data: usersData, error: usersError } = await adminSupabase
           .from('users')
           .select('id, name, email, avatar_url, created_at')
         
@@ -188,7 +188,8 @@ export default function TasksPage() {
         completed: false,
         projectId: taskData.projectId,
         assignedTo: taskData.assignedTo,
-        dueDate: taskData.dueDate
+        dueDate: taskData.dueDate,
+        createdBy: user.id
       }, user.id);
       
       if (newTodo) {

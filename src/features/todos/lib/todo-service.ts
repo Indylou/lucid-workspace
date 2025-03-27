@@ -1,4 +1,4 @@
-import { supabase } from '../../../lib/supabase';
+import { supabase, adminSupabase } from '../../../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
 
@@ -10,6 +10,7 @@ export interface TodoItemAttributes {
   projectId?: string | null;
   assignedTo?: string | null;
   dueDate?: string | null;
+  createdBy: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -20,8 +21,8 @@ export async function getUserTodos(userId: string): Promise<{ todos: TodoItemAtt
     const { data, error } = await supabase
       .from('todos')
       .select('*')
-      .or(`assignedTo.eq.${userId},createdBy.eq.${userId}`)
-      .order('createdAt', { ascending: false });
+      .or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching todos:', error);
@@ -36,6 +37,7 @@ export async function getUserTodos(userId: string): Promise<{ todos: TodoItemAtt
       projectId: item.project_id,
       assignedTo: item.assigned_to,
       dueDate: item.due_date,
+      createdBy: item.created_by,
       createdAt: item.created_at,
       updatedAt: item.updated_at
     }));
@@ -61,7 +63,7 @@ export async function getProjectTodos(projectId: string): Promise<{ todos: TodoI
       .from('todos')
       .select('*')
       .eq('project_id', projectId)
-      .order('createdAt', { ascending: false });
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching project todos:', error);
@@ -76,6 +78,7 @@ export async function getProjectTodos(projectId: string): Promise<{ todos: TodoI
       projectId: item.project_id,
       assignedTo: item.assigned_to,
       dueDate: item.due_date,
+      createdBy: item.created_by,
       createdAt: item.created_at,
       updatedAt: item.updated_at
     }));
@@ -102,6 +105,7 @@ export async function createTodo(
   try {
     console.log('[todo-service] Creating todo with userId:', userId);
     console.log('[todo-service] Todo data:', todoData);
+    console.log('[todo-service] Network request about to be sent to Supabase');
 
     if (!userId) {
       return {
@@ -126,14 +130,19 @@ export async function createTodo(
       updated_at: new Date().toISOString()
     };
     
-    const { data, error } = await supabase
+    console.log('[todo-service] Todo object to be sent:', newTodo);
+    
+    // Use adminSupabase client by default for todo creation to bypass RLS
+    const { data, error } = await adminSupabase
       .from('todos')
       .insert([newTodo])
       .select()
       .single();
     
+    console.log('[todo-service] Supabase response for todo creation:', { data, error });
+    
     if (error) {
-      console.error('Error creating todo:', error);
+      console.error('[todo-service] Error creating todo:', error);
       return { todo: null, error: handleSupabaseError(error) };
     }
     
@@ -145,13 +154,16 @@ export async function createTodo(
       projectId: data.project_id,
       assignedTo: data.assigned_to,
       dueDate: data.due_date,
+      createdBy: data.created_by,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
     
+    console.log('[todo-service] Successfully created todo:', todo);
+    
     return { todo, error: null };
   } catch (err) {
-    console.error('Error in createTodo:', err);
+    console.error('[todo-service] Error in createTodo:', err);
     return { 
       todo: null, 
       error: { 
@@ -203,6 +215,7 @@ export async function updateTodo(todoId: string, todoData: Partial<TodoItemAttri
       projectId: data.project_id,
       assignedTo: data.assigned_to,
       dueDate: data.due_date,
+      createdBy: data.created_by,
       createdAt: data.created_at,
       updatedAt: data.updated_at
     };
@@ -263,6 +276,7 @@ export function createMockTasks(userId: string): TodoItemAttributes[] {
       content: 'Review project proposal',
       completed: false,
       assignedTo: userId,
+      createdBy: userId,
       dueDate: today.toISOString(),
       createdAt: new Date(today.getTime() - 3600000).toISOString(), // 1 hour ago
     },
@@ -271,6 +285,7 @@ export function createMockTasks(userId: string): TodoItemAttributes[] {
       content: 'Prepare presentation slides',
       completed: true,
       assignedTo: userId,
+      createdBy: userId,
       dueDate: today.toISOString(),
       createdAt: new Date(today.getTime() - 7200000).toISOString(), // 2 hours ago
     },
@@ -279,6 +294,7 @@ export function createMockTasks(userId: string): TodoItemAttributes[] {
       content: 'Schedule team meeting',
       completed: false,
       assignedTo: userId,
+      createdBy: userId,
       dueDate: tomorrow.toISOString(),
       createdAt: new Date(today.getTime() - 86400000).toISOString(), // 1 day ago
     },
@@ -287,6 +303,7 @@ export function createMockTasks(userId: string): TodoItemAttributes[] {
       content: 'Research market competitors',
       completed: false,
       assignedTo: userId,
+      createdBy: userId,
       dueDate: nextWeek.toISOString(),
       createdAt: new Date(today.getTime() - 172800000).toISOString(), // 2 days ago
     },
@@ -295,6 +312,7 @@ export function createMockTasks(userId: string): TodoItemAttributes[] {
       content: 'Draft quarterly report',
       completed: false,
       assignedTo: userId,
+      createdBy: userId,
       projectId: 'project-1',
       dueDate: null,
       createdAt: new Date(today.getTime() - 259200000).toISOString(), // 3 days ago

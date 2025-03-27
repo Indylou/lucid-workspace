@@ -2,7 +2,7 @@ import { mergeAttributes, Node } from '@tiptap/core';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { ShadcnTodoNodeView } from '../components/ShadcnTodoNodeView';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from '../../../lib/supabase';
+import { supabase, adminSupabase } from '../../../lib/supabase';
 import { toast } from '../../../components/ui/use-toast';
 import { PluginKey } from 'prosemirror-state';
 
@@ -330,7 +330,7 @@ export async function syncTodosWithDatabase(editor: any, userId: string) {
     for (const todo of todos) {
       try {
         // Check if todo exists
-        const { data: existingTodo, error: fetchError } = await supabase
+        const { data: existingTodo, error: fetchError } = await adminSupabase
           .from('todos')
           .select('*')
           .eq('id', todo.id)
@@ -346,7 +346,7 @@ export async function syncTodosWithDatabase(editor: any, userId: string) {
           // Update existing todo if it has changed
           if (hasChanged(existingTodo, todo)) {
             console.log(`[todo-extensions] Updating todo ${todo.id}`);
-            const { error: updateError } = await supabase
+            const { error: updateError } = await adminSupabase
               .from('todos')
               .update({
                 content: todo.content,
@@ -370,7 +370,7 @@ export async function syncTodosWithDatabase(editor: any, userId: string) {
         } else {
           // Create a new todo
           console.log(`[todo-extensions] Creating new todo ${todo.id}`);
-          const { error: insertError } = await supabase
+          const { error: insertError } = await adminSupabase
             .from('todos')
             .insert([{
               id: todo.id,

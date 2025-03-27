@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { supabase, Project } from '../../../lib/supabase';
 import { TodoItemAttributes } from '../lib/todo-service';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
@@ -38,6 +38,7 @@ export function mapDbTodoToFrontend(dbTodo: any): TodoItemAttributes {
     projectId: dbTodo.project_id,
     assignedTo: dbTodo.assigned_to,
     dueDate: dbTodo.due_date,
+    createdBy: dbTodo.created_by,
     createdAt: dbTodo.created_at,
     updatedAt: dbTodo.updated_at
   };
@@ -226,10 +227,37 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   // Setup useEffect to fetch both todos and projects
   useEffect(() => {
     if (user?.id) {
-      fetchTodos();
-      fetchProjects();
+      // Add debounce for data fetching
+      let isMounted = true;
+      
+      // Use a debounced fetch to avoid multiple rapid requests
+      const timer = setTimeout(() => {
+        if (!isMounted) return;
+        
+        fetchTodos();
+        fetchProjects();
+      }, 500);
+      
+      return () => {
+        isMounted = false;
+        clearTimeout(timer);
+      };
     }
   }, [user?.id]);
+
+  // Add a throttled refresh function
+  const lastRefreshRef = useRef<number>(0);
+  const refreshTodos = async () => {
+    const now = Date.now();
+    // Don't allow refreshes more often than every 2 seconds
+    if (now - lastRefreshRef.current < 2000) {
+      console.log('Throttling refresh request');
+      return;
+    }
+    
+    lastRefreshRef.current = now;
+    await fetchTodos();
+  };
 
   const addTodo = async (todo: TodoItem) => {
     if (!user?.id) return;
@@ -312,7 +340,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
         createTodo,
         updateTodoAttributes,
         deleteTodoById,
-        refreshTodos: fetchTodos,
+        refreshTodos,
         projects,
         addTodo,
         updateTodo,
