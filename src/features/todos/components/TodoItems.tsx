@@ -219,16 +219,24 @@ export function EnhancedTodoItem({
     
     try {
       if (onUpdate) {
-        await onUpdate(id, { assignedTo: userId });
+        // Convert "_none" to null for the database
+        const assigneeValue = userId === '_none' ? null : userId;
+        await onUpdate(id, { assignedTo: assigneeValue });
       } else {
-        const { error } = await updateTodo(id, { assignedTo: userId });
+        // Convert "_none" to null for the database
+        const assigneeValue = userId === '_none' ? null : userId;
+        const { error } = await updateTodo(id, { assignedTo: assigneeValue });
         if (error) throw error;
       }
 
-      const userName = users.find(u => u.id === userId)?.name || 'user';
+      // Get appropriate message
+      const message = userId === '_none' 
+        ? 'Task unassigned.' 
+        : `Task assigned to ${users.find(u => u.id === userId)?.name || 'user'}.`;
+      
       toast({
         title: 'Assignee updated',
-        description: `Task assigned to ${userName}.`,
+        description: message,
       });
     } catch (error) {
       console.error('Failed to update assignee:', error);
@@ -340,14 +348,14 @@ export function EnhancedTodoItem({
             {/* Assignee selection */}
             {users.length > 0 && (
               <Select 
-                value={selectedUser || ''} 
+                value={selectedUser || '_none'} 
                 onValueChange={handleAssigneeChange}
               >
                 <SelectTrigger className="h-7 w-[140px] text-xs">
                   <SelectValue placeholder="Assign to..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="_none">Unassigned</SelectItem>
                   {users.map((user) => (
                     <SelectItem key={user.id} value={user.id}>
                       <div className="flex items-center gap-2">

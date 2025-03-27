@@ -1,4 +1,4 @@
-import { supabase, adminSupabase } from '../../../lib/supabase';
+import { supabase } from '../../../lib/supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
 
@@ -15,83 +15,110 @@ export interface TodoItemAttributes {
   updatedAt?: string;
 }
 
-// Get all todo items for a user
-export async function getUserTodos(userId: string): Promise<{ todos: TodoItemAttributes[]; error: AppError | null; }> {
+// Helper function to map database fields to frontend fields
+function mapDbTodoToFrontend(dbTodo: any): TodoItemAttributes {
+  return {
+    id: dbTodo.id,
+    content: dbTodo.content,
+    completed: dbTodo.completed || false,
+    projectId: dbTodo.project_id,
+    assignedTo: dbTodo.assigned_to,
+    dueDate: dbTodo.due_date,
+    createdBy: dbTodo.created_by,
+    createdAt: dbTodo.created_at,
+    updatedAt: dbTodo.updated_at
+  };
+}
+
+// Helper function to map frontend fields to database fields
+function mapFrontendTodoToDb(todo: Partial<TodoItemAttributes>): any {
+  const dbTodo: any = {};
+  
+  if (todo.content !== undefined) dbTodo.content = todo.content;
+  if (todo.completed !== undefined) dbTodo.completed = todo.completed;
+  if (todo.projectId !== undefined) dbTodo.project_id = todo.projectId;
+  if (todo.assignedTo !== undefined) dbTodo.assigned_to = todo.assignedTo;
+  if (todo.dueDate !== undefined) dbTodo.due_date = todo.dueDate;
+  if (todo.createdBy !== undefined) dbTodo.created_by = todo.createdBy;
+  
+  return dbTodo;
+}
+
+// Get todos for user
+export async function getUserTodos(userId: string): Promise<{ todos: TodoItemAttributes[], error: AppError | null }> {
   try {
     const { data, error } = await supabase
       .from('todos')
       .select('*')
       .or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
       .order('created_at', { ascending: false });
-    
+      
     if (error) {
-      console.error('Error fetching todos:', error);
       return { todos: [], error: handleSupabaseError(error) };
     }
     
-    // Transform the data to match our expected format
-    const todos = data.map(item => ({
-      id: item.id,
-      content: item.content,
-      completed: item.completed || false,
-      projectId: item.project_id,
-      assignedTo: item.assigned_to,
-      dueDate: item.due_date,
-      createdBy: item.created_by,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at
-    }));
-    
+    const todos = data.map(mapDbTodoToFrontend);
     return { todos, error: null };
   } catch (err) {
-    console.error('Error in getUserTodos:', err);
     return { 
       todos: [], 
       error: { 
-        type: ErrorType.UNKNOWN, 
-        message: 'Failed to fetch todos',
-        originalError: err
+        type: ErrorType.DATA_FETCH, 
+        message: 'Failed to fetch todos', 
+        originalError: err as Error 
       } 
     };
   }
 }
 
-// Get all todo items for a project
-export async function getProjectTodos(projectId: string): Promise<{ todos: TodoItemAttributes[]; error: AppError | null; }> {
+// Get todos by project
+export async function getProjectTodos(projectId: string): Promise<{ todos: TodoItemAttributes[], error: AppError | null }> {
   try {
     const { data, error } = await supabase
       .from('todos')
       .select('*')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false });
-    
+      
     if (error) {
-      console.error('Error fetching project todos:', error);
       return { todos: [], error: handleSupabaseError(error) };
     }
     
-    // Transform the data
-    const todos = data.map(item => ({
-      id: item.id,
-      content: item.content,
-      completed: item.completed || false,
-      projectId: item.project_id,
-      assignedTo: item.assigned_to,
-      dueDate: item.due_date,
-      createdBy: item.created_by,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at
-    }));
-    
+    const todos = data.map(mapDbTodoToFrontend);
     return { todos, error: null };
   } catch (err) {
-    console.error('Error in getProjectTodos:', err);
     return { 
       todos: [], 
       error: { 
-        type: ErrorType.UNKNOWN, 
-        message: 'Failed to fetch project todos',
-        originalError: err
+        type: ErrorType.DATA_FETCH, 
+        message: 'Failed to fetch project todos', 
+        originalError: err as Error 
+      } 
+    };
+  }
+}
+
+// Get a specific todo
+export async function getTodoById(todoId: string): Promise<{ todo: TodoItemAttributes | null, error: AppError | null }> {
+  try {
+    const { data, error } = await supabase
+      .from('todos')
+      .select('*')
+      .eq('id', todoId)
+      .single();
+      
+    if (error) {
+      return { todo: null, error: handleSupabaseError(error) };
+    }
+    
+    return { todo: mapDbTodoToFrontend(data), error: null };
+  } catch (err) {
+    return { 
+      todo: null, 
+      error: { 
+        type: ErrorType.DATA_FETCH, 
+        message: 'Failed to fetch todo', 
+        originalError: err as Error 
       } 
     };
   }
@@ -103,10 +130,6 @@ export async function createTodo(
   userId: string
 ): Promise<{ todo: TodoItemAttributes | null; error: AppError | null; }> {
   try {
-    console.log('[todo-service] Creating todo with userId:', userId);
-    console.log('[todo-service] Todo data:', todoData);
-    console.log('[todo-service] Network request about to be sent to Supabase');
-
     if (!userId) {
       return {
         todo: null,
@@ -118,144 +141,165 @@ export async function createTodo(
       };
     }
 
-    const newTodo = {
-      id: uuidv4(),
+    // Prepare the todo data in database format
+    const dbTodo = {
       content: todoData.content,
       completed: todoData.completed || false,
       project_id: todoData.projectId,
       assigned_to: todoData.assignedTo,
       due_date: todoData.dueDate,
-      created_by: userId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      created_by: userId
     };
     
-    console.log('[todo-service] Todo object to be sent:', newTodo);
-    
-    // Use adminSupabase client by default for todo creation to bypass RLS
-    const { data, error } = await adminSupabase
+    // Insert the todo
+    const { data, error } = await supabase
       .from('todos')
-      .insert([newTodo])
+      .insert(dbTodo)
       .select()
       .single();
-    
-    console.log('[todo-service] Supabase response for todo creation:', { data, error });
-    
+      
     if (error) {
-      console.error('[todo-service] Error creating todo:', error);
       return { todo: null, error: handleSupabaseError(error) };
     }
     
-    // Transform the response
-    const todo: TodoItemAttributes = {
-      id: data.id,
-      content: data.content,
-      completed: data.completed || false,
-      projectId: data.project_id,
-      assignedTo: data.assigned_to,
-      dueDate: data.due_date,
-      createdBy: data.created_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
-    
-    console.log('[todo-service] Successfully created todo:', todo);
-    
-    return { todo, error: null };
+    return { todo: mapDbTodoToFrontend(data), error: null };
   } catch (err) {
-    console.error('[todo-service] Error in createTodo:', err);
     return { 
       todo: null, 
       error: { 
-        type: ErrorType.UNKNOWN, 
-        message: 'Failed to create todo',
-        originalError: err
+        type: ErrorType.DATA_CREATE, 
+        message: 'Failed to create todo', 
+        originalError: err as Error 
       } 
     };
   }
 }
 
-// Update a todo item
-export async function updateTodo(todoId: string, todoData: Partial<TodoItemAttributes>): Promise<{ todo: TodoItemAttributes | null; error: AppError | null; }> {
+// Update a todo
+export async function updateTodo(
+  todoId: string,
+  todoData: Partial<TodoItemAttributes>
+): Promise<{ todo: TodoItemAttributes | null; error: AppError | null; }> {
   try {
-    // Transform our camelCase to snake_case for Supabase
-    const updateData = {
-      content: todoData.content,
-      completed: todoData.completed,
-      project_id: todoData.projectId,
-      assigned_to: todoData.assignedTo,
-      due_date: todoData.dueDate,
-      updated_at: new Date().toISOString()
-    };
+    // Convert frontend fields to database fields
+    const dbTodo = mapFrontendTodoToDb(todoData);
     
-    // Remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key as keyof typeof updateData] === undefined) {
-        delete updateData[key as keyof typeof updateData];
-      }
-    });
+    // Add updated_at timestamp
+    dbTodo.updated_at = new Date().toISOString();
     
+    // Update the todo
     const { data, error } = await supabase
       .from('todos')
-      .update(updateData)
+      .update(dbTodo)
       .eq('id', todoId)
       .select()
       .single();
-    
+      
     if (error) {
-      console.error('Error updating todo:', error);
       return { todo: null, error: handleSupabaseError(error) };
     }
     
-    // Transform the response
-    const todo: TodoItemAttributes = {
-      id: data.id,
-      content: data.content,
-      completed: data.completed || false,
-      projectId: data.project_id,
-      assignedTo: data.assigned_to,
-      dueDate: data.due_date,
-      createdBy: data.created_by,
-      createdAt: data.created_at,
-      updatedAt: data.updated_at
-    };
-    
-    return { todo, error: null };
+    return { todo: mapDbTodoToFrontend(data), error: null };
   } catch (err) {
-    console.error('Error in updateTodo:', err);
     return { 
       todo: null, 
       error: { 
-        type: ErrorType.UNKNOWN, 
-        message: 'Failed to update todo',
-        originalError: err
+        type: ErrorType.DATA_UPDATE, 
+        message: 'Failed to update todo', 
+        originalError: err as Error 
       } 
     };
   }
 }
 
-// Delete a todo item
-export async function deleteTodo(todoId: string): Promise<{ success: boolean; error: AppError | null; }> {
+// Delete a todo
+export async function deleteTodo(
+  todoId: string
+): Promise<{ success: boolean; error: AppError | null; }> {
   try {
     const { error } = await supabase
       .from('todos')
       .delete()
       .eq('id', todoId);
-    
+      
     if (error) {
-      console.error('Error deleting todo:', error);
       return { success: false, error: handleSupabaseError(error) };
     }
     
     return { success: true, error: null };
   } catch (err) {
-    console.error('Error in deleteTodo:', err);
     return { 
       success: false, 
       error: { 
-        type: ErrorType.UNKNOWN, 
-        message: 'Failed to delete todo',
-        originalError: err
+        type: ErrorType.DATA_DELETE, 
+        message: 'Failed to delete todo', 
+        originalError: err as Error 
+      } 
+    };
+  }
+}
+
+// Toggle completion status
+export async function toggleTodoCompletion(
+  todoId: string,
+  currentStatus: boolean
+): Promise<{ todo: TodoItemAttributes | null; error: AppError | null; }> {
+  try {
+    const { data, error } = await supabase
+      .from('todos')
+      .update({ 
+        completed: !currentStatus,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', todoId)
+      .select()
+      .single();
+      
+    if (error) {
+      return { todo: null, error: handleSupabaseError(error) };
+    }
+    
+    return { todo: mapDbTodoToFrontend(data), error: null };
+  } catch (err) {
+    return { 
+      todo: null, 
+      error: { 
+        type: ErrorType.DATA_UPDATE, 
+        message: 'Failed to toggle todo completion', 
+        originalError: err as Error 
+      } 
+    };
+  }
+}
+
+// Assign todo to user
+export async function assignTodo(
+  todoId: string,
+  userId: string | null
+): Promise<{ todo: TodoItemAttributes | null; error: AppError | null; }> {
+  try {
+    const { data, error } = await supabase
+      .from('todos')
+      .update({ 
+        assigned_to: userId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', todoId)
+      .select()
+      .single();
+      
+    if (error) {
+      return { todo: null, error: handleSupabaseError(error) };
+    }
+    
+    return { todo: mapDbTodoToFrontend(data), error: null };
+  } catch (err) {
+    return { 
+      todo: null, 
+      error: { 
+        type: ErrorType.DATA_UPDATE, 
+        message: 'Failed to assign todo', 
+        originalError: err as Error 
       } 
     };
   }

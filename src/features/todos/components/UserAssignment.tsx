@@ -45,8 +45,9 @@ export function UserAssignment({ userId }: UserAssignmentProps) {
       try {
         fetchedRef.current = true
         
+        // Use the users view instead of profiles
         const { data, error } = await adminSupabase
-          .from('users')
+          .from('users')  // Changed from 'profiles' to 'users'
           .select('id, email, name, avatar_url')
           .eq('id', memoUserId)
           .single()
@@ -70,7 +71,7 @@ export function UserAssignment({ userId }: UserAssignmentProps) {
     return () => {
       fetchedRef.current = false
     }
-  }, [memoUserId])
+  }, [memoUserId, user?.id])
 
   if (!user) return null
 

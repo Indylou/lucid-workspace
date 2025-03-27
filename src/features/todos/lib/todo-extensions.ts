@@ -5,6 +5,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase, adminSupabase } from '../../../lib/supabase';
 import { toast } from '../../../components/ui/use-toast';
 import { PluginKey } from 'prosemirror-state';
+import { Editor } from "@tiptap/core";
+import { findChildren } from "@tiptap/core";
+import { createTodo, updateTodo as updateTodoRecord, deleteTodo } from './todo-service';
 
 // ============================================================================
 // TodoExtension - The main extension for todo functionality
@@ -330,7 +333,7 @@ export async function syncTodosWithDatabase(editor: any, userId: string) {
     for (const todo of todos) {
       try {
         // Check if todo exists
-        const { data: existingTodo, error: fetchError } = await adminSupabase
+        const { data: existingTodo, error: fetchError } = await supabase
           .from('todos')
           .select('*')
           .eq('id', todo.id)
@@ -346,7 +349,7 @@ export async function syncTodosWithDatabase(editor: any, userId: string) {
           // Update existing todo if it has changed
           if (hasChanged(existingTodo, todo)) {
             console.log(`[todo-extensions] Updating todo ${todo.id}`);
-            const { error: updateError } = await adminSupabase
+            const { error: updateError } = await supabase
               .from('todos')
               .update({
                 content: todo.content,
@@ -370,7 +373,7 @@ export async function syncTodosWithDatabase(editor: any, userId: string) {
         } else {
           // Create a new todo
           console.log(`[todo-extensions] Creating new todo ${todo.id}`);
-          const { error: insertError } = await adminSupabase
+          const { error: insertError } = await supabase
             .from('todos')
             .insert([{
               id: todo.id,

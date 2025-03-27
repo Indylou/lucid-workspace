@@ -11,7 +11,6 @@ interface Config {
   // Supabase
   supabase: {
     url: string;
-    serviceRoleKey: string;
     anonKey: string;
   };
   
@@ -54,9 +53,8 @@ function getBoolEnv(key: string, fallback: boolean = false): boolean {
 // Create the config object
 const config: Config = {
   supabase: {
-    url: getEnv('SUPABASE_URL', 'https://tygibsmxqdslroimelkh.supabase.co'),
-    serviceRoleKey: getEnv('SUPABASE_SERVICE_ROLE_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z2lic214cWRzbHJvaW1lbGtoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0Mjg3MDMwMiwiZXhwIjoyMDU4NDQ2MzAyfQ.2ik-HtsUm-V-xkBIYWiWGlIRVZoGIU6uBcYK8tGVFVg'),
-    anonKey: getEnv('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z2lic214cWRzbHJvaW1lbGtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4NzAzMDIsImV4cCI6MjA1ODQ0NjMwMn0.ar3hEgext-BNJtibzCFPAMQBStNtmS02Y8aXBLnjwcU'),
+    url: getEnv('SUPABASE_URL', 'https://mcmagcpqpcttlocrgtiu.supabase.co'),
+    anonKey: getEnv('SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbWFnY3BxcGN0dGxvY3JndGl1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMwOTU5MzAsImV4cCI6MjA1ODY3MTkzMH0._6iDouo1u1pizyYvrdnI3Kjaq3-Le_urUc8-Hx5j61s'),
   },
   
   nodeEnv: getEnv('NODE_ENV', 'development') as Environment,

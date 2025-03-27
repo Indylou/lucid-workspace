@@ -276,6 +276,83 @@ export function TasksModule() {
     }
   };
   
+  // TEMPORARY: RLS Debugging function - DELETE AFTER DEBUGGING
+  const testRLS = async () => {
+    try {
+      console.log('=== Starting RLS Test ===');
+      
+      // 1. Check current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Current session:', {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        email: session?.user?.email,
+        role: session?.user?.role
+      });
+
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        return;
+      }
+
+      // 2. Test read operation
+      const { data: readData, error: readError } = await supabase
+        .from('todos')
+        .select('*')
+        .limit(1);
+
+      if (readError) {
+        console.error('Read operation error:', {
+          message: readError.message,
+          details: readError.details,
+          hint: readError.hint
+        });
+      } else {
+        console.log('Read operation successful:', readData);
+      }
+
+      // 3. Test write operation
+      const { data: writeData, error: writeError } = await supabase
+        .from('todos')
+        .insert({ 
+          content: 'RLS Test Todo', 
+          completed: false,
+          created_by: session?.user?.id 
+        })
+        .select()
+        .single();
+
+      if (writeError) {
+        console.error('Write operation error:', {
+          message: writeError.message,
+          details: writeError.details,
+          hint: writeError.hint
+        });
+      } else {
+        console.log('Write operation successful:', writeData);
+      }
+
+      console.log('=== RLS Test Complete ===');
+    } catch (error) {
+      console.error('RLS Test error:', error);
+    }
+  };
+
+  // Add test button to UI - DELETE AFTER DEBUGGING
+  useEffect(() => {
+    // Add test button to the DOM
+    const testButton = document.createElement('button');
+    testButton.textContent = 'Test RLS';
+    testButton.className = 'fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded';
+    testButton.onclick = () => testRLS();
+    document.body.appendChild(testButton);
+
+    // Cleanup
+    return () => {
+      document.body.removeChild(testButton);
+    };
+  }, []);
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">

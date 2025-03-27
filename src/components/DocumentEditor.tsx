@@ -32,7 +32,6 @@ interface DocumentWithFavorite extends SupabaseDocument {
   // These fields may not exist in the database but are used in the UI
   favorite?: boolean;
   status?: string;
-  created_by?: string;
 }
 
 interface DocumentEditorProps {

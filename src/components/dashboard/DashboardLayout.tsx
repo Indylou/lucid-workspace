@@ -535,6 +535,10 @@ export function DashboardLayout() {
                 <Settings className="h-5 w-5" />
                 {!sidebarCollapsed && <span className="ml-3 font-medium">Settings</span>}
               </Link>
+              <Link to="/test-supabase" className="flex items-center p-2 rounded-lg my-1 hover:bg-muted text-amber-500">
+                <Activity className="h-5 w-5" />
+                {!sidebarCollapsed && <span className="ml-3 font-medium">Test Supabase</span>}
+              </Link>
               <button 
                 className="flex items-center p-2 rounded-lg my-1 hover:bg-muted w-full text-left"
                 onClick={logout}

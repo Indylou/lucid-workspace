@@ -54,8 +54,9 @@ export function UserSelector({ onSelect, currentUserId }: UserSelectorProps) {
       try {
         fetchingRef.current = true;
         
+        // Use the users view instead of profiles
         const { data, error } = await adminSupabase
-          .from('users')
+          .from('users')  // Changed from 'profiles' to 'users'
           .select('id, email, name, avatar_url')
           .order('name')
 

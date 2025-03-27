@@ -90,10 +90,10 @@ alter table public.todo_attachments enable row level security;
 -- Create RLS policies
 
 -- Users policies
-create policy "Users can read own profile"
+create policy "Anyone can read user profiles"
   on public.users
   for select
-  using (auth.uid() = id);
+  using (true);
 
 create policy "Users can update own profile"
   on public.users

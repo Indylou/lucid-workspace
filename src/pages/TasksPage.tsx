@@ -334,24 +334,27 @@ export default function TasksPage() {
                 <Label>Assigned To</Label>
                 <Select
                   value={userFilter || 'all'}
-                  onValueChange={(value: string) => setUserFilter(value === 'all' ? null : value)}
+                  onValueChange={value => setUserFilter(value === 'all' ? null : value)}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Users" />
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Filter by User" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Users</SelectItem>
                     <SelectItem value={user?.id || '_self'}>
-                      Assigned to me
+                      <div className="flex items-center">
+                        <span className="ml-2">Me</span>
+                      </div>
                     </SelectItem>
                     {users
                       .filter(u => u.id !== user?.id)
                       .map(u => (
                         <SelectItem key={u.id} value={u.id}>
-                          {u.name || u.email}
+                          <div className="flex items-center">
+                            <span className="ml-2">{u.name || u.email}</span>
+                          </div>
                         </SelectItem>
-                      ))
-                    }
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

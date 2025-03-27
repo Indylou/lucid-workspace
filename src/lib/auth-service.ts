@@ -1,9 +1,5 @@
-import { supabase, adminSupabase } from './supabase'
-import { User } from './supabase'
+import { supabase, User } from './supabase'
 import { handleAuthError, handleSupabaseError, AppError, ErrorType } from './error-handling'
-import { v4 as uuidv4 } from 'uuid';
-
-
 
 // Authentication service to handle user login, registration, and session management
 export interface AuthState {
@@ -23,9 +19,11 @@ export interface LoginData {
   password: string
 }
 
-// Register a new user
+// Register a new user with the new Supabase implementation
 export async function registerUser(data: RegisterData): Promise<{ user: User | null; error: AppError | null }> {
   try {
+    console.log('[Auth Service] Registering user:', data.email);
+    
     // Sign up with Supabase Auth
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: data.email,
@@ -35,119 +33,56 @@ export async function registerUser(data: RegisterData): Promise<{ user: User | n
           name: data.name
         }
       }
-    })
+    });
     
     if (signUpError) {
-      console.error('Registration error:', signUpError)
-      return { user: null, error: handleAuthError(signUpError) }
+      console.error('[Auth Service] Registration error:', signUpError);
+      return { user: null, error: handleAuthError(signUpError) };
     }
 
     if (!authData.user) {
       return { 
         user: null, 
         error: handleAuthError('Failed to create user') 
-      }
-    }
-
-    // Create user profile using our helper function for consistency
-    const { success, user: newUser, error: createError } = await createUserRecord({
-      id: authData.user.id,
-      name: data.name,
-      email: data.email
-    });
-
-    if (!success || createError) {
-      console.error('Error creating user profile:', createError)
-      return { 
-        user: null, 
-        error: { 
-          type: ErrorType.DATA_CREATE,
-          message: 'Failed to create user record',
-          originalError: createError || new Error('Unknown error creating user')
-        }
       };
     }
     
-    return { user: newUser as User, error: null }
-  } catch (err) {
-    console.error('Registration error:', err)
-    return { 
-      user: null, 
-      error: handleAuthError(err as Error) 
-    }
-  }
-}
-
-// Login a user
-export async function loginUser(data: LoginData): Promise<{ user: User | null; error: AppError | null }> {
-  try {
-    console.log('[Auth Service] Attempting login for:', data.email);
-    
-    // Direct database lookup approach using the anon key (which is working)
-    console.log('[Auth Service] Looking up user by email in database');
-    
-    // Use standard supabase client with anon key
-    const { data: existingUser, error: userError } = await supabase
-      .from('users')
+    // Get profile from the profiles table 
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('*')
-      .eq('email', data.email)
-      .maybeSingle();
+      .eq('id', authData.user.id)
+      .single();
+    
+    if (profileError) {
+      console.error('[Auth Service] Error fetching profile:', profileError);
       
-    if (userError) {
-      console.error('[Auth Service] Error querying user by email:', userError);
-      return { 
-        user: null, 
-        error: { 
-          type: ErrorType.DATA_FETCH,
-          message: 'Failed to check if user exists',
-          originalError: userError
-        }
+      // Return basic user info even if profile fetch fails
+      // The trigger should have created the profile automatically
+      const basicUser: User = {
+        id: authData.user.id,
+        name: data.name,
+        email: data.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-    }
-    
-    console.log('[Auth Service] User lookup result:', existingUser ? 'Found' : 'Not found');
-    
-    // If user exists in database, return it
-    if (existingUser) {
-      console.log('[Auth Service] Found existing user with ID:', existingUser.id);
-      return { 
-        user: existingUser as User, 
-        error: null 
-      };
-    }
-    
-    // If not found in database, create a simplified user record
-    console.log('[Auth Service] User not found. Creating simplified user record for:', data.email);
-    
-    // Generate a UUID for the user
-    const userId = uuidv4();
-    console.log('[Auth Service] Generated UUID for new user:', userId);
-    
-    // Use our helper function to create the user record
-    const { success, user: newUser, error: createError } = await createUserRecord({
-      id: userId,
-      email: data.email,
-      name: data.email.split('@')[0],
-      avatar_url: undefined
-    });
       
-    if (!success || createError) {
-      console.error('[Auth Service] Failed to create user record:', createError);
-      return { 
-        user: null, 
-        error: { 
-          type: ErrorType.DATA_CREATE,
-          message: 'Failed to create user record',
-          originalError: createError || new Error('Unknown error creating user')
-        }
-      };
+      return { user: basicUser, error: null };
     }
     
-    console.log('[Auth Service] Successfully created user record with ID:', newUser?.id);
-    console.log('[Auth Service] Login process completed successfully');
-    return { user: newUser as User, error: null };
+    // Transform profile data to User type
+    const user: User = {
+      id: profile.id,
+      name: profile.name,
+      email: authData.user.email || '',
+      avatar_url: profile.avatar_url,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
+    
+    return { user, error: null };
   } catch (err) {
-    console.error('[Auth Service] Login error:', err);
+    console.error('[Auth Service] Registration error:', err);
     return { 
       user: null, 
       error: handleAuthError(err as Error) 
@@ -155,7 +90,78 @@ export async function loginUser(data: LoginData): Promise<{ user: User | null; e
   }
 }
 
-// Handle OTP verification
+// Login a user with the new Supabase implementation
+export async function loginUser(data: LoginData): Promise<{ user: User | null; error: AppError | null }> {
+  try {
+    console.log('[Auth Service] Attempting login for:', data.email);
+    
+    // Authenticate with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password
+    });
+
+    if (authError) {
+      console.error('[Auth Service] Auth error:', authError);
+      return { 
+        user: null, 
+        error: handleAuthError(authError)
+      };
+    }
+
+    if (!authData.user) {
+      console.error('[Auth Service] No user data returned from auth');
+      return {
+        user: null,
+        error: handleAuthError('Authentication failed')
+      };
+    }
+
+    console.log('[Auth Service] Auth successful, user ID:', authData.user.id);
+
+    // Get user profile from the profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+      
+    if (profileError) {
+      console.error('[Auth Service] Error fetching profile:', profileError);
+      
+      // Return basic user info even if profile fetch fails
+      const basicUser: User = {
+        id: authData.user.id,
+        name: authData.user.user_metadata?.name || 'User',
+        email: authData.user.email || '',
+        created_at: authData.user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      return { user: basicUser, error: null };
+    }
+    
+    // Transform profile data to User type
+    const user: User = {
+      id: profile.id,
+      name: profile.name,
+      email: authData.user.email || '',
+      avatar_url: profile.avatar_url,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
+    
+    return { user, error: null };
+  } catch (err) {
+    console.error('[Auth Service] Login error:', err);
+    return { 
+      user: null, 
+      error: handleAuthError(err as Error)
+    };
+  }
+}
+
+// Handle email link verification with the new Supabase implementation
 export async function handleEmailLink(): Promise<{ user: User | null; error: AppError | null }> {
   try {
     // Get session from email link verification
@@ -174,45 +180,16 @@ export async function handleEmailLink(): Promise<{ user: User | null; error: App
     console.log('[Auth Service] Found session after email verification for user:', session.user.id);
     
     // Get user profile data
-    const { data: userData, error: profileError } = await adminSupabase
-      .from('users')
-      .select('id, name, email, avatar_url, created_at, updated_at')
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
       .eq('id', session.user.id)
       .single();
     
     if (profileError) {
-      console.error('[Auth Service] Error fetching user profile:', profileError);
+      console.error('[Auth Service] Error fetching profile:', profileError);
       
-      // If the user has no profile after email verification, create one
-      if (profileError.code === 'PGRST116') { // "No rows returned"
-        console.log('[Auth Service] User verified email but has no profile. Creating profile.');
-        
-        // Create a user record
-        const { success, user: newUser, error: createError } = await createUserRecord({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-          avatar_url: session.user.user_metadata?.avatar_url
-        });
-        
-        if (!success || createError) {
-          console.error('[Auth Service] Failed to create user profile after verification:', createError);
-          // Return a basic user object even if profile creation fails
-          const basicUser: User = {
-            id: session.user.id,
-            name: session.user.user_metadata?.name || 'User',
-            email: session.user.email || '',
-            created_at: session.user.created_at || new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          };
-          return { user: basicUser, error: null };
-        }
-        
-        console.log('[Auth Service] Successfully created user profile after verification');
-        return { user: newUser as User, error: null };
-      }
-      
-      // Return a basic user even if profile fetch fails
+      // Return basic user even if profile fetch fails
       const basicUser: User = {
         id: session.user.id,
         name: session.user.user_metadata?.name || 'User',
@@ -220,133 +197,113 @@ export async function handleEmailLink(): Promise<{ user: User | null; error: App
         created_at: session.user.created_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+      
       return { user: basicUser, error: null };
     }
     
-    console.log('[Auth Service] Successfully retrieved user profile after verification');
-    return { user: userData as User, error: null };
+    // Transform profile data to User type
+    const user: User = {
+      id: profile.id,
+      name: profile.name,
+      email: session.user.email || '',
+      avatar_url: profile.avatar_url,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
+    
+    return { user, error: null };
   } catch (err) {
     console.error('[Auth Service] Email verification error:', err);
     return { user: null, error: handleAuthError(err as Error) };
   }
 }
 
-// Check if user is logged in
+// Check if user is logged in with the new Supabase implementation
 export async function checkAuth(): Promise<{ user: User | null; error: AppError | null }> {
   try {
     // Get current session from Supabase Auth
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      console.error('[Auth Service] Session error:', sessionError)
-      return { user: null, error: handleAuthError(sessionError) }
+      console.error('[Auth Service] Session error:', sessionError);
+      return { user: null, error: handleAuthError(sessionError) };
     }
     
     if (!session || !session.user) {
       console.log('[Auth Service] No active session found');
-      return { user: null, error: null }
+      return { user: null, error: null };
     }
     
     console.log('[Auth Service] Found active session for user:', session.user.id);
     
-    // Get user profile from the users table
-    const { data: userData, error: profileError } = await adminSupabase
-      .from('users')
+    // Get user profile from the profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
       .select('*')
       .eq('id', session.user.id)
-      .single()
+      .single();
     
     if (profileError) {
-      console.error('[Auth Service] Error fetching user profile:', profileError);
+      console.error('[Auth Service] Error fetching profile:', profileError);
       
-      // If the user has an auth session but no profile, create one
-      if (profileError.code === 'PGRST116') { // "No rows returned"
-        console.log('[Auth Service] User has auth session but no profile. Creating profile.');
-        
-        // Create a user record
-        const { success, user: newUser, error: createError } = await createUserRecord({
-          id: session.user.id,
-          email: session.user.email || '',
-          name: session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User',
-          avatar_url: session.user.user_metadata?.avatar_url
-        });
-        
-        if (!success || createError) {
-          console.error('[Auth Service] Failed to create user profile:', createError);
-          return { 
-            user: null, 
-            error: { 
-              type: ErrorType.DATA_CREATE, 
-              message: 'Failed to create user profile',
-              originalError: createError || new Error('Unknown error creating user profile')
-            } 
-          };
-        }
-        
-        console.log('[Auth Service] Successfully created user profile');
-        return { user: newUser as User, error: null };
-      }
+      // Return basic user info even if profile fetch fails
+      const basicUser: User = {
+        id: session.user.id,
+        name: session.user.user_metadata?.name || 'User',
+        email: session.user.email || '',
+        created_at: session.user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
       
-      return { user: null, error: handleSupabaseError(profileError) }
+      return { user: basicUser, error: null };
     }
     
-    console.log('[Auth Service] Successfully retrieved user profile');
-    return { user: userData as User, error: null }
+    // Transform profile data to User type
+    const user: User = {
+      id: profile.id,
+      name: profile.name,
+      email: session.user.email || '',
+      avatar_url: profile.avatar_url,
+      created_at: profile.created_at,
+      updated_at: profile.updated_at
+    };
+    
+    return { user, error: null };
   } catch (err) {
-    console.error('[Auth Service] Auth check error:', err)
+    console.error('[Auth Service] Auth error:', err);
     return { 
       user: null, 
       error: handleAuthError(err as Error) 
-    }
+    };
   }
 }
 
-// Logout user
-export async function logout(): Promise<void> {
-  await supabase.auth.signOut()
-}
-
-/**
- * Create a user record in the public.users table
- * This is a simplification to avoid setting up migrations and triggers
- */
-export async function createUserRecord(user: { id: string, email: string, name?: string, avatar_url?: string }) {
-  console.log('[Auth Service] Creating user record with:', {
-    id: user.id,
-    email: user.email,
-    name: user.name || user.email.split('@')[0],
-  });
-  
-  // Prepare the user record according to schema
-  const userRecord = {
-    id: user.id,
-    name: user.name || user.email.split('@')[0], // Use email username as name if not provided
-    email: user.email,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-  
-  // Only add avatar_url if it exists to match schema expectations
-  if (user.avatar_url) {
-    Object.assign(userRecord, { avatar_url: user.avatar_url });
-  }
-  
+// Sign out user with the new Supabase implementation
+export async function signOut(): Promise<{ error: AppError | null }> {
   try {
-    // Insert into database using adminSupabase with service role key
-    const { data, error } = await adminSupabase
-      .from('users')
-      .insert([userRecord])
-      .select();
+    const { error } = await supabase.auth.signOut();
     
     if (error) {
-      console.error('[Auth Service] Failed to create user record:', error);
-      return { success: false, error };
+      console.error('[Auth Service] Sign out error:', error);
+      return { error: handleAuthError(error) };
     }
     
-    console.log('[Auth Service] User record created successfully');
-    return { success: true, user: data[0] };
-  } catch (error) {
-    console.error('[Auth Service] Error creating user record:', error);
-    return { success: false, error };
+    return { error: null };
+  } catch (err) {
+    console.error('[Auth Service] Sign out error:', err);
+    return { error: handleAuthError(err as Error) };
   }
+}
+
+// Export signOut as logout for backwards compatibility
+export const logout = signOut;
+
+// Placeholder implementation
+export async function createUserRecord(userData: { id: string, name: string, email: string, avatar_url?: string }): Promise<{ success: boolean, user: User | null, error: Error | null }> {
+  console.log('Create user record called with:', userData);
+  return {
+    success: false,
+    user: null,
+    error: new Error('Supabase implementation disabled')
+  };
 } 

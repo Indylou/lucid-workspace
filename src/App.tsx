@@ -11,6 +11,7 @@ import { ToastProvider } from './components/ui/use-toast';
 import { UserProvider } from './components/UserProvider';
 import { useUser } from './lib/user-context';
 import { TodoProvider } from './features/todos/hooks';
+import TestSupabasePage from './pages/test-supabase';
 import './App.css';
 
 // Create auth context
@@ -188,6 +189,16 @@ function AppRoutes({ location }: { location: ReturnType<typeof useLocation> }) {
           element={
             <ProtectedRoute>
               <DashboardLayout />
+            </ProtectedRoute>
+          } 
+        />
+        
+        {/* Supabase Test route */}
+        <Route 
+          path="/test-supabase" 
+          element={
+            <ProtectedRoute>
+              <TestSupabasePage />
             </ProtectedRoute>
           } 
         />

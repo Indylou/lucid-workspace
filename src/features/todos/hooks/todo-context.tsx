@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { supabase, Project } from '../../../lib/supabase';
-import { TodoItemAttributes } from '../lib/todo-service';
+import { TodoItemAttributes, getUserTodos, createTodo as apiCreateTodo, updateTodo as apiUpdateTodo, deleteTodo as apiDeleteTodo, toggleTodoCompletion, assignTodo } from '../lib/todo-service';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
 import { useUser } from '../../../lib/user-context';
 import { TodoItem } from '../../../types/todo';
+import { getUserProjects } from '../../../lib/project-service';
 
 type TodoContextType = {
   todos: TodoItemAttributes[];
@@ -47,7 +48,7 @@ export function mapDbTodoToFrontend(dbTodo: any): TodoItemAttributes {
 export function TodoProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
   const [todos, setTodos] = useState<TodoItemAttributes[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'completed' | 'incomplete' | 'overdue'>('all');
@@ -69,7 +70,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     return acc;
   }, {} as Record<string, TodoItemAttributes[]>);
 
-  // Fetch todos function
+  // Fetch todos function 
   const fetchTodos = useCallback(async () => {
     if (!user?.id) return;
     
@@ -77,40 +78,14 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     setError(null);
     
     try {
-      // First, verify the user exists using the pattern from auth-service.ts
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (userError) {
-        console.error('[todo-context] Error verifying user:', userError);
-        throw handleSupabaseError(userError, ErrorType.DATA_FETCH);
-      }
+      const { todos: fetchedTodos, error: todosError } = await getUserTodos(user.id);
       
-      if (!existingUser) {
-        console.error('[todo-context] User not found with ID:', user.id);
-        setError({
-          type: ErrorType.DATA_FETCH,
-          message: 'User not found',
-          originalError: new Error('User not found')
-        });
-        setLoading(false);
+      if (todosError) {
+        setError(todosError);
         return;
       }
       
-      // Now fetch the todos
-      const { data, error } = await supabase
-        .from('todos')
-        .select('*')
-        .eq('created_by', user.id);
-        
-      if (error) {
-        throw handleSupabaseError(error, ErrorType.DATA_FETCH);
-      }
-      
-      setTodos(data.map(mapDbTodoToFrontend));
+      setTodos(fetchedTodos);
     } catch (err) {
       setError(err as AppError);
     } finally {
@@ -123,34 +98,14 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
     
     try {
-      // First, verify the user exists using the pattern from auth-service.ts
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (userError) {
-        console.error('[todo-context] Error verifying user:', userError);
-        return; // Just return, no need to throw
+      const { projects: userProjects, error: projectsError } = await getUserProjects(user.id);
+      
+      if (projectsError) {
+        console.error('Error fetching projects:', projectsError);
+        return;
       }
       
-      if (!existingUser) {
-        console.error('[todo-context] User not found with ID:', user.id);
-        return; // Just return, no need to throw
-      }
-      
-      // Now fetch the projects
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('created_by', user.id);
-        
-      if (error) {
-        throw handleSupabaseError(error, ErrorType.DATA_FETCH);
-      }
-      
-      setProjects(data);
+      setProjects(userProjects);
     } catch (err) {
       console.error('Error fetching projects:', err);
     }
@@ -160,56 +115,13 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   const createTodo = async (todoData: Omit<TodoItemAttributes, 'id' | 'createdAt'>, userId: string): Promise<TodoItemAttributes | null> => {
     if (!user?.id) return null;
     
-    console.log('[todo-context] Creating todo with context user.id:', user.id);
-    console.log('[todo-context] Creating todo with provided userId:', userId);
-    console.log('[todo-context] Todo data:', todoData);
-    
     try {
-      // First, look up the user directly using the working pattern from auth-service.ts
-      // This approach is working in the login functionality
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-        
-      if (userError) {
-        console.error('[todo-context] Error fetching user:', userError);
+      const { todo: newTodo, error: createError } = await apiCreateTodo(todoData, userId);
+      
+      if (createError || !newTodo) {
+        console.error('Error creating todo:', createError);
         return null;
       }
-      
-      if (!existingUser) {
-        console.error('[todo-context] User not found with ID:', userId);
-        return null;
-      }
-      
-      console.log('[todo-context] Successfully verified user exists');
-      
-      const now = new Date().toISOString();
-      
-      // Insert with snake_case field names for database
-      const { data, error } = await supabase
-        .from('todos')
-        .insert({
-          content: todoData.content,
-          completed: todoData.completed || false,
-          project_id: todoData.projectId,
-          assigned_to: todoData.assignedTo,
-          due_date: todoData.dueDate,
-          created_at: now,
-          updated_at: now,
-          created_by: userId
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error creating todo:', error);
-        return null;
-      }
-      
-      // Transform to frontend format
-      const newTodo = mapDbTodoToFrontend(data);
       
       // Update local state
       setTodos(prev => [newTodo, ...prev]);
@@ -226,46 +138,14 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return null;
     
     try {
-      // First, verify the user exists using the pattern from auth-service.ts
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (userError || !existingUser) {
-        console.error('[todo-context] User verification failed:', userError || 'User not found');
+      const { todo: updatedTodo, error: updateError } = await apiUpdateTodo(todoId, todoData);
+      
+      if (updateError || !updatedTodo) {
+        console.error('Error updating todo:', updateError);
         return null;
       }
       
-      const updateData: Record<string, any> = {
-        content: todoData.content,
-        completed: todoData.completed,
-        project_id: todoData.projectId,
-        assigned_to: todoData.assignedTo,
-        due_date: todoData.dueDate,
-        updated_at: new Date().toISOString()
-      };
-      
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined) {
-          delete updateData[key];
-        }
-      });
-      
-      const { data, error } = await supabase
-        .from('todos')
-        .update(updateData)
-        .eq('id', todoId)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Error updating todo:', error);
-        return null;
-      }
-      
-      const updatedTodo = mapDbTodoToFrontend(data);
+      // Update local state
       setTodos(prev => prev.map(todo => 
         todo.id === todoId ? updatedTodo : todo
       ));
@@ -278,34 +158,19 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   };
 
   // Delete a todo
-  const deleteTodoById = async (todoId: string): Promise<boolean> => {
+  const deleteTodoById = async (id: string): Promise<boolean> => {
     if (!user?.id) return false;
     
     try {
-      // First, verify the user exists using the pattern from auth-service.ts
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (userError || !existingUser) {
-        console.error('[todo-context] User verification failed:', userError || 'User not found');
-        return false;
-      }
+      const { success, error: deleteError } = await apiDeleteTodo(id);
       
-      const { error } = await supabase
-        .from('todos')
-        .delete()
-        .eq('id', todoId);
-      
-      if (error) {
-        console.error('Error deleting todo:', error);
+      if (deleteError || !success) {
+        console.error('Error deleting todo:', deleteError);
         return false;
       }
       
       // Update local state
-      setTodos(prev => prev.filter(todo => todo.id !== todoId));
+      setTodos(prev => prev.filter(todo => todo.id !== id));
       
       return true;
     } catch (err) {
@@ -335,9 +200,9 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, fetchTodos, fetchProjects]);
 
-  // Add a throttled refresh function
+  // Refresh todos function
   const lastRefreshRef = useRef<number>(0);
-  const refreshTodos = async () => {
+  const refreshTodos = async (): Promise<void> => {
     const now = Date.now();
     // Don't allow refreshes more often than every 2 seconds
     if (now - lastRefreshRef.current < 2000) {
@@ -349,22 +214,21 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     await fetchTodos();
   };
 
+  // New todo CRUD operations
   const addTodo = async (todo: TodoItem) => {
     if (!user?.id) return;
     
     try {
-      const { error } = await supabase
-        .from('todos')
-        .insert([{
-          ...todo,
-          created_by: user.id
-        }]);
-
-      if (error) {
-        throw handleSupabaseError(error, ErrorType.DATA_CREATE);
-      }
-
-      await fetchTodos();
+      const todoData = {
+        content: todo.content,
+        completed: todo.completed || false,
+        projectId: todo.projectId,
+        assignedTo: todo.assignedTo,
+        dueDate: todo.dueDate,
+        createdBy: user.id
+      };
+      
+      await createTodo(todoData, user.id);
     } catch (err) {
       setError(err as AppError);
     }
@@ -374,20 +238,15 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
     
     try {
-      const { error } = await supabase
-        .from('todos')
-        .update({
-          ...todo,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', todo.id)
-        .eq('created_by', user.id);
-
-      if (error) {
-        throw handleSupabaseError(error, ErrorType.DATA_UPDATE);
-      }
-
-      await fetchTodos();
+      const todoData = {
+        content: todo.content,
+        completed: todo.completed,
+        projectId: todo.projectId,
+        assignedTo: todo.assignedTo,
+        dueDate: todo.dueDate
+      };
+      
+      await updateTodoAttributes(todo.id, todoData);
     } catch (err) {
       setError(err as AppError);
     }
@@ -397,17 +256,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     if (!user?.id) return;
     
     try {
-      const { error } = await supabase
-        .from('todos')
-        .delete()
-        .eq('id', id)
-        .eq('created_by', user.id);
-
-      if (error) {
-        throw handleSupabaseError(error, ErrorType.DATA_DELETE);
-      }
-
-      await fetchTodos();
+      await deleteTodoById(id);
     } catch (err) {
       setError(err as AppError);
     }
@@ -442,7 +291,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Custom hook to use the todo context
+// Hook to use the todo context
 export function useTodos() {
   const context = useContext(TodoContext);
   if (context === undefined) {
