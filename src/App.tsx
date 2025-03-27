@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 import TodoEditorPage from './pages/TodoEditorPage';
@@ -37,14 +37,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const { setUser } = useUser();
 
-  const refreshAuth = async () => {
+  const refreshAuth = useCallback(async () => {
     try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
       const { user, error } = await checkAuth();
-      console.log('[AuthProvider] Auth state updated:', { userId: user?.id });
+      
+      // Update auth state first
       setAuthState({ user, loading: false, error });
-      // Sync with UserContext
-      console.log('[AuthProvider] Syncing with UserContext:', { userId: user?.id });
+      
+      // Then sync with UserContext
       setUser(user);
     } catch (error) {
       console.error('[AuthProvider] Auth error:', error);
@@ -53,16 +53,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading: false, 
         error: handleAuthError('Failed to authenticate') 
       });
-      // Sync with UserContext on error
       setUser(null);
     }
-  };
+  }, [setUser]);
 
-  // Check auth on mount
+  // Check auth on mount only
   useEffect(() => {
     console.log('[AuthProvider] Initial auth check');
     refreshAuth();
-  }, [refreshAuth]);
+  }, []); // Remove refreshAuth from dependencies to prevent loops
 
   return (
     <AuthContext.Provider value={{ ...authState, refreshAuth }}>
@@ -99,7 +98,12 @@ function AppRoutes({ location }: { location: ReturnType<typeof useLocation> }) {
   // A wrapper component that checks if the user is authenticated
   const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     if (loading) {
-      return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <span className="ml-3 text-muted-foreground">Loading...</span>
+        </div>
+      );
     }
     
     if (!user) {

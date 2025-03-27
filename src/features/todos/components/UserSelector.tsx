@@ -14,7 +14,7 @@ import { useUser } from '../../../lib/user-context'
 interface User {
   id: string
   email: string
-  full_name?: string
+  name?: string
   avatar_url?: string
   user_metadata?: {
     avatar_url?: string
@@ -41,8 +41,8 @@ export function UserSelector({ onSelect, currentUserId }: UserSelectorProps) {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, full_name, avatar_url')
-        .order('full_name')
+        .select('id, email, name, avatar_url')
+        .order('name')
 
       if (error) throw error
       setUsers(data || [])
@@ -100,11 +100,11 @@ export function UserSelector({ onSelect, currentUserId }: UserSelectorProps) {
               <div className={`w-full flex items-center ${currentUserId === user.id ? 'font-medium' : ''}`}>
                 <Avatar className="h-5 w-5 mr-2">
                   <AvatarFallback>
-                    {(user.full_name?.charAt(0) || user.email.charAt(0)).toUpperCase()}
+                    {(user.name?.charAt(0) || user.email.charAt(0)).toUpperCase()}
                   </AvatarFallback>
                   {user.avatar_url && <AvatarImage src={user.avatar_url} />}
                 </Avatar>
-                <span className="flex-1">{user.full_name || user.email.split('@')[0]}</span>
+                <span className="flex-1">{user.name || user.email.split('@')[0]}</span>
                 {currentUserId === user.id && (
                   <Check className="h-3.5 w-3.5 ml-2 text-primary" />
                 )}

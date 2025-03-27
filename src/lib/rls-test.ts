@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { getCurrentSession } from './auth-service';
 
 /**
  * Utility to test Row Level Security (RLS) policies
@@ -7,7 +6,7 @@ import { getCurrentSession } from './auth-service';
 
 // Test if the current user can insert into documents table
 export async function testDocumentsInsert() {
-  const session = getCurrentSession();
+  const { data: { session } } = await supabase.auth.getSession();
   console.log('Current session:', session);
   
   try {
@@ -18,7 +17,7 @@ export async function testDocumentsInsert() {
         {
           title: 'Test Document RLS',
           content: 'This is a test for RLS policies',
-          created_by: session?.user_id || 'anonymous'
+          created_by: session?.user?.id || 'anonymous'
         }
       ])
       .select();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Component } from 'react';
+import React, { useState, useEffect, useRef, Component, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { 
@@ -15,10 +15,6 @@ import {
   Redo, 
   ArrowLeft,
   Save,
-  Image,
-  Link,
-  Table,
-  CheckSquare,
   Loader2,
   ListTodo
 } from 'lucide-react';
@@ -28,11 +24,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from '../App';
 import { toast } from './ui/use-toast';
 import { supabase, Document as SupabaseDocument } from '../lib/supabase';
-import { initTodoSync, findTodos, syncTodosWithDatabase } from '../features/todos/lib/todo-extensions';
-import { checkTablePermissions } from '../lib/rls-test';
-import { getCurrentSession } from '../lib/auth-service';
+import { initTodoSync, syncTodosWithDatabase } from '../features/todos/lib/todo-extensions';
 import { createDocument, updateDocument } from '../lib/document-service';
-import { useUser } from '../lib/user-context';
 
 // Extend the Document type to include optional properties that may not exist in the database
 interface DocumentWithFavorite extends SupabaseDocument {
@@ -93,10 +86,68 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
 
+  // Handle saving the document
+  const handleSave = useCallback(async () => {
+    if (!activeDocument || !user) return;
+    
+    setSaving(true);
+    try {
+      const documentData = {
+        title,
+        content,
+        projectId: activeDocument.project_id
+      };
+
+      if (documentId === 'new') {
+        const { document: newDoc, error } = await createDocument(documentData);
+        
+        if (error) {
+          throw new Error(error);
+        }
+        
+        if (newDoc) {
+          setActiveDocument({
+            ...newDoc,
+            favorite: false,
+            status: 'Draft'
+          });
+          navigate(`/documents/${newDoc.id}`, { replace: true });
+          toast({
+            title: 'Success',
+            description: 'Document created successfully'
+          });
+        }
+      } else {
+        const { document: updatedDoc, error } = await updateDocument(documentId, documentData);
+        if (error) {
+          throw new Error(error);
+        }
+        
+        if (updatedDoc) {
+          setActiveDocument({
+            ...activeDocument,
+            ...updatedDoc
+          });
+          toast({
+            title: 'Success',
+            description: 'Document saved successfully'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error saving document:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to save document'
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, [activeDocument, content, documentId, navigate, title, user]);
+
   // Update document title in browser tab when title changes
   useEffect(() => {
     if (title) {
-      // Update the document title in the browser tab
       document.title = `${title} - Lucid`;
     } else {
       document.title = 'Untitled Document - Lucid';
@@ -106,25 +157,22 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
   // Auto-save after 5 seconds of inactivity
   useEffect(() => {
     if (pendingChanges && activeDocument) {
-      // Clear any existing timeout
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
       
-      // Set a new timeout for auto-save
       saveTimeoutRef.current = setTimeout(() => {
         handleSave();
         setPendingChanges(false);
-      }, 5000); // 5 seconds delay
+      }, 5000);
     }
     
     return () => {
-      // Clean up the timeout when the component unmounts
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [pendingChanges, content, title]);
+  }, [pendingChanges, content, title, activeDocument, handleSave]);
 
   // Fetch document data when component mounts
   useEffect(() => {
@@ -253,140 +301,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
     };
   }, [editor, user?.id]);
 
-  // Handle saving the document
-  const handleSave = async () => {
-    if (!activeDocument) return;
-
-    if (!activeDocument.title.trim()) {
-      toast({
-        title: "Title Required",
-        description: "Please enter a title for your document."
-      });
-      return;
-    }
-
-    // Make sure content is not an empty string and doesn't contain empty text nodes
-    if (!content.trim()) {
-      toast({
-        title: "Content Required",
-        description: "Please add some content to your document."
-      });
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      // Force sync todos before saving
-      if (editor && user?.id) {
-        await syncTodosWithDatabase(editor, user.id);
-      }
-      
-      // Prepare the content - ensure no empty text nodes
-      let safeContent = content;
-      
-      // If the editor is available, get sanitized content
-      if (editor) {
-        try {
-          // Force a re-parse of content to validate it
-          const validContent = editor.getHTML();
-          safeContent = validContent;
-        } catch (err) {
-          console.error('Error sanitizing content:', err);
-          toast({
-            title: "Content Error",
-            description: "There was an issue with the document content. Please try again."
-          });
-          setSaving(false);
-          return;
-        }
-      }
-
-      if (documentId === 'new') {
-        // Create new document
-        const { document: createdDocument, error } = await createDocument({
-          title: activeDocument.title,
-          content: safeContent,
-          projectId: activeDocument.project_id
-        });
-
-        if (error) {
-          console.error('Error creating document:', error);
-          toast({
-            title: "Failed to create document",
-            description: error
-          });
-          return;
-        }
-
-        if (createdDocument) {
-          // Update active document with the new document data
-          setActiveDocument({
-            ...activeDocument,
-            id: createdDocument.id,
-            created_at: createdDocument.created_at,
-            updated_at: createdDocument.updated_at
-          });
-          
-          // Navigate to the created document URL
-          navigate(`/documents/${createdDocument.id}`, { replace: true });
-          
-          toast({
-            title: "Document Created",
-            description: "Your document has been created successfully."
-          });
-        }
-      } else {
-        // Update existing document
-        const { document: updatedDocument, error } = await updateDocument(documentId, {
-          title: activeDocument.title,
-          content: safeContent,
-          projectId: activeDocument.project_id
-        });
-
-        if (error) {
-          console.error('Error updating document:', error);
-          toast({
-            title: "Failed to update document",
-            description: error
-          });
-          return;
-        }
-
-        if (updatedDocument) {
-          // Update active document with the latest data
-          setActiveDocument({
-            ...activeDocument,
-            ...updatedDocument
-          });
-          
-          toast({
-            title: "Document Updated",
-            description: "Your document has been saved successfully."
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error saving document:', err);
-      toast({
-        title: "Error",
-        description: "An unexpected error occurred while saving the document."
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Toggle favorite status
-  const toggleFavorite = () => {
-    if (activeDocument) {
-      setActiveDocument({
-        ...activeDocument,
-        favorite: !activeDocument.favorite
-      });
-    }
-  };
-
   // Format date for display
   const formatDate = (date: Date) => {
     return formatDistanceToNow(date, { addSuffix: true });
@@ -421,28 +335,12 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
     editor?.chain().focus().toggleOrderedList().run();
   };
 
-  const handleTodoList = () => {
-    editor?.chain().focus().addTodo().run();
-  };
-
   const handleBlockquote = () => {
     editor?.chain().focus().toggleBlockquote().run();
   };
 
   const handleCodeBlock = () => {
     editor?.chain().focus().toggleCodeBlock().run();
-  };
-
-  const handleInsertTodo = () => {
-    if (editor) {
-      editor.chain()
-        .focus()
-        .addTodo()
-        .run();
-      
-      // After creating the todo, ensure focus remains in the editor
-      editor.commands.focus();
-    }
   };
 
   const handleUndo = () => {
@@ -477,14 +375,6 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
 
   const handleTodoClick = () => {
     editor?.chain().focus().addTodo().run();
-  };
-
-  const handleAddTodo = () => {
-    editor?.chain().focus().addTodo().run();
-  };
-
-  const handleToggleTodo = () => {
-    editor?.chain().focus().toggleTodo().run();
   };
 
   if (loading) return (

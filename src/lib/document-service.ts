@@ -1,5 +1,4 @@
-import { supabase, authQuery } from './supabase';
-import { getCurrentSession } from './auth-service';
+import { supabase } from './supabase';
 
 export interface Document {
   id: string;
@@ -20,8 +19,8 @@ export async function createDocument(data: {
   content: string; 
   projectId?: string | null;
 }): Promise<{ document: Document | null; error: string | null }> {
-  const session = getCurrentSession();
-  const userId = session?.user_id;
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
   
   if (!userId) {
     return { 
@@ -33,8 +32,7 @@ export async function createDocument(data: {
   try {
     console.log('Creating document with user ID:', userId);
     
-    // Use the authQuery helper that adds the auth token
-    const { data: documentData, error } = await authQuery
+    const { data: documentData, error } = await supabase
       .from('documents')
       .insert([
         {
@@ -80,8 +78,8 @@ export async function updateDocument(id: string, data: {
   content?: string;
   projectId?: string | null;
 }): Promise<{ document: Document | null; error: string | null }> {
-  const session = getCurrentSession();
-  const userId = session?.user_id;
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
   
   if (!userId) {
     return { 
@@ -100,7 +98,7 @@ export async function updateDocument(id: string, data: {
       updated_at: new Date().toISOString()
     };
     
-    const { data: documentData, error } = await authQuery
+    const { data: documentData, error } = await supabase
       .from('documents')
       .update(updates)
       .eq('id', id)
@@ -136,7 +134,7 @@ export async function updateDocument(id: string, data: {
  */
 export async function getDocument(id: string): Promise<{ document: Document | null; error: string | null }> {
   try {
-    const { data, error } = await authQuery
+    const { data, error } = await supabase
       .from('documents')
       .select('*')
       .eq('id', id)
@@ -161,8 +159,8 @@ export async function getDocument(id: string): Promise<{ document: Document | nu
  * Get all documents for the current user
  */
 export async function getUserDocuments(): Promise<{ documents: Document[]; error: string | null }> {
-  const session = getCurrentSession();
-  const userId = session?.user_id;
+  const { data: { session } } = await supabase.auth.getSession();
+  const userId = session?.user?.id;
   
   if (!userId) {
     return { 
@@ -172,7 +170,7 @@ export async function getUserDocuments(): Promise<{ documents: Document[]; error
   }
   
   try {
-    const { data, error } = await authQuery
+    const { data, error } = await supabase
       .from('documents')
       .select('*')
       .eq('created_by', userId)

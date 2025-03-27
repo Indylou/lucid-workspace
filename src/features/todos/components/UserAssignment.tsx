@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase'
 interface User {
   id: string
   email: string
-  full_name?: string
+  name?: string
   avatar_url?: string
 }
 
@@ -21,7 +21,7 @@ export function UserAssignment({ userId }: UserAssignmentProps) {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('id, email, full_name, avatar_url')
+          .select('id, email, name, avatar_url')
           .eq('id', userId)
           .single()
 
@@ -43,11 +43,11 @@ export function UserAssignment({ userId }: UserAssignmentProps) {
     <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-md">
       <Avatar className="h-4 w-4">
         <AvatarFallback>
-          {(user.full_name?.charAt(0) || user.email.charAt(0)).toUpperCase()}
+          {(user.name?.charAt(0) || user.email.charAt(0)).toUpperCase()}
         </AvatarFallback>
         {user.avatar_url && <AvatarImage src={user.avatar_url} />}
       </Avatar>
-      <span>{user.full_name || user.email.split('@')[0]}</span>
+      <span>{user.name || user.email.split('@')[0]}</span>
     </div>
   )
 } 

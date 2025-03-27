@@ -19,39 +19,22 @@ import { useAuth } from '../../App'
 import { supabase } from '../../lib/supabase'
 import { toast } from "../ui/use-toast"
 import { StarterKit } from '@tiptap/starter-kit'
-import Image from '@tiptap/extension-image'
-import Link from '@tiptap/extension-link'
-import Underline from '@tiptap/extension-underline'
-import TextStyle from '@tiptap/extension-text-style'
-import FontFamily from '@tiptap/extension-font-family'
-import Color from '@tiptap/extension-color'
-import Highlight from '@tiptap/extension-highlight'
-import HorizontalRule from '@tiptap/extension-horizontal-rule'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { TodoToolbar } from '../../features/todos/components/todo-toolbar'
 import { TodoAttachment } from "../../lib/storage-service"
-import Placeholder from '@tiptap/extension-placeholder'
 import Document from '@tiptap/extension-document'
 import Paragraph from '@tiptap/extension-paragraph'
 import Text from '@tiptap/extension-text'
 import Bold from '@tiptap/extension-bold'
 import Italic from '@tiptap/extension-italic'
 import Heading from '@tiptap/extension-heading'
-import BulletList from '@tiptap/extension-bullet-list'
-import OrderedList from '@tiptap/extension-ordered-list'
-import ListItem from '@tiptap/extension-list-item'
 import CodeBlock from '@tiptap/extension-code-block'
 import Blockquote from '@tiptap/extension-blockquote'
-import { ReactRenderer } from '@tiptap/react'
-import tippy from 'tippy.js'
-import 'tippy.js/dist/tippy.css'
-import { MentionList } from './MentionList'
-import Mention from '@tiptap/extension-mention'
-import Typography from '@tiptap/extension-typography'
-import { TodoExtension } from '../../features/todos/lib/todo-extensions'
 import Strike from '@tiptap/extension-strike'
 import Code from '@tiptap/extension-code'
 import { Extension } from '@tiptap/core'
+import Underline from '@tiptap/extension-underline'
+import { TodoExtension } from '../../features/todos/lib/todo-extensions'
 
 interface EnhancedRichTextEditorProps {
   className?: string
@@ -233,9 +216,9 @@ export const EnhancedRichTextEditor = React.forwardRef<HTMLDivElement, EnhancedR
     }, [editor, handleTodoAttachment])
 
     const handleUpdate = React.useCallback(
-      (html: string) => {
-        if (html !== initialContent) {
-          onChange(html)
+      (value: string) => {
+        if (value !== initialContent) {
+          onChange(value)
         }
       },
       [onChange, initialContent]
@@ -244,7 +227,7 @@ export const EnhancedRichTextEditor = React.forwardRef<HTMLDivElement, EnhancedR
     return (
       <div className={cn("", className)} ref={ref} onKeyDown={props.onKeyDown}>
         {props.previewMode && (
-          <Tabs defaultValue={showPreview ? "preview" : "edit"} onValueChange={(value) => setShowPreview(value === "preview")}>
+          <Tabs defaultValue={showPreview ? "preview" : "edit"} onValueChange={(value: string) => setShowPreview(value === "preview")}>
             <TabsList className="grid w-full grid-cols-2 mb-2">
               <TabsTrigger value="edit">Edit</TabsTrigger>
               <TabsTrigger value="preview">Preview</TabsTrigger>

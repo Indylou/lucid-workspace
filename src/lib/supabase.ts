@@ -1,56 +1,62 @@
 import { createClient } from '@supabase/supabase-js'
-import { getCurrentSession } from './auth-service';
 
 // Supabase URL and anon key
-// Use environment variables when available (Docker/production) or fallback to hardcoded values for development
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'YOUR_SUPABASE_URL'
-const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY'
+const supabaseUrl = 'https://tygibsmxqdslroimelkh.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5Z2lic214cWRzbHJvaW1lbGtoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4NzAzMDIsImV4cCI6MjA1ODQ0NjMwMn0.ar3hEgext-BNJtibzCFPAMQBStNtmS02Y8aXBLnjwcU'
 
-if (!supabaseUrl || supabaseUrl === 'YOUR_SUPABASE_URL') {
-  throw new Error('REACT_APP_SUPABASE_URL is not configured')
+// Create a single supabase client for the entire app with auth configuration
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false
+  },
+  global: {
+    headers: {
+      'Authorization': `Bearer ${supabaseAnonKey}`
+    }
+  }
+})
+
+// Create a separate admin client that can bypass RLS
+export const adminSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    headers: {
+      'apikey': supabaseAnonKey,
+      'Authorization': `Bearer ${supabaseAnonKey}`,
+      'x-supabase-auth': 'preferService'
+    }
+  }
+})
+
+// Test function to verify connectivity
+export async function testSupabaseConnection() {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .limit(1)
+    
+    if (error) {
+      console.error('Supabase connection test failed:', error)
+      return false
+    }
+    
+    console.log('Supabase connection test succeeded:', data)
+    return true
+  } catch (err) {
+    console.error('Supabase connection test threw error:', err)
+    return false
+  }
 }
 
-if (!supabaseAnonKey || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY') {
-  throw new Error('REACT_APP_SUPABASE_ANON_KEY is not configured')
-}
-
-// Create a single supabase client for the entire app
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Run test on init
+testSupabaseConnection()
+  .then(success => console.log('Initial connection test:', success ? 'OK' : 'FAILED'))
+  .catch(err => console.error('Connection test error:', err))
 
 // Log Supabase initialization
 console.log('Supabase client initialized with URL:', supabaseUrl);
-
-// Function to get auth headers for requests
-export const getAuthHeaders = (): Record<string, string> => {
-  const session = getCurrentSession();
-  if (session?.session_token) {
-    // Use apikey authorization instead of trying to use a session token as JWT
-    // The session token is not a valid JWT and cannot be used directly
-    return {
-      apikey: supabaseAnonKey,
-      // Include user ID in a custom header for RLS policies
-      'x-user-id': session.user_id
-    };
-  }
-  return {};
-};
-
-// Enhanced query builder that adds auth headers
-export const authQuery = {
-  from: (table: string) => {
-    const builder = supabase.from(table);
-    const headers = getAuthHeaders();
-    
-    if (Object.keys(headers).length > 0) {
-      builder.headers = {
-        ...builder.headers,
-        ...headers
-      };
-    }
-    
-    return builder;
-  }
-};
 
 // Suppress specific connection error messages
 const originalConsoleError = console.error;
