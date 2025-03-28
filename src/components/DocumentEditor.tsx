@@ -86,8 +86,11 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
   const cleanupRef = useRef<(() => void) | null>(null);
 
   // Handle saving the document
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (isAutoSave = false) => {
     if (!activeDocument || !user) return;
+    
+    console.log('Saving document with title:', title);
+    console.log('Current document state:', activeDocument);
     
     setSaving(true);
     try {
@@ -96,6 +99,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
         content,
         projectId: activeDocument.project_id
       };
+      
+      console.log('Sending document data to server:', documentData);
 
       if (documentId === 'new') {
         const { document: newDoc, error } = await createDocument(documentData);
@@ -105,16 +110,20 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
         }
         
         if (newDoc) {
+          console.log('New document created:', newDoc);
           setActiveDocument({
             ...newDoc,
             favorite: false,
             status: 'Draft'
           });
           navigate(`/documents/${newDoc.id}`, { replace: true });
-          toast({
-            title: 'Success',
-            description: 'Document created successfully'
-          });
+          
+          if (!isAutoSave) {
+            toast({
+              title: 'Success',
+              description: 'Document created successfully'
+            });
+          }
         }
       } else {
         const { document: updatedDoc, error } = await updateDocument(documentId, documentData);
@@ -123,14 +132,18 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
         }
         
         if (updatedDoc) {
+          console.log('Document updated:', updatedDoc);
           setActiveDocument({
             ...activeDocument,
             ...updatedDoc
           });
-          toast({
-            title: 'Success',
-            description: 'Document saved successfully'
-          });
+          
+          if (!isAutoSave) {
+            toast({
+              title: 'Success',
+              description: 'Document saved successfully'
+            });
+          }
         }
       }
     } catch (error) {
@@ -161,9 +174,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
       }
       
       saveTimeoutRef.current = setTimeout(() => {
-        handleSave();
+        handleSave(true); // Pass true to indicate this is an auto-save
         setPendingChanges(false);
-      }, 5000);
+      }, 5000); // 5 seconds delay for auto-save
     }
     
     return () => {
@@ -181,23 +194,29 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
       try {
         if (documentId === 'new') {
           // Set up new empty document
+          console.log('Setting up new document');
+          
+          // For new documents, use a default title and empty content
+          const defaultTitle = 'Untitled Document';
+          const defaultContent = '<h1>Untitled Document</h1><p></p>';
+          
           setActiveDocument({
             id: 'new',
-            title: 'Untitled Document',
-            content: '',
+            title: defaultTitle,
+            content: defaultContent,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             created_by: user?.id || ''
-            // These fields don't exist in the database schema
           });
           
-          setTitle('Untitled Document');
-          setContent('');
+          setTitle(defaultTitle);
+          setContent(defaultContent);
           setLoading(false);
           return;
         }
         
         // Fetch existing document
+        console.log('Fetching document with id:', documentId);
         const { data, error } = await supabase
           .from('documents')
           .select('*')
@@ -208,16 +227,23 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
           throw error;
         }
         
+        console.log('Document loaded from server:', data);
+        
+        // Get the document title from the database, not from content
+        const documentTitle = data.title || 'Untitled Document';
+        
         // Ensure consistent interface properties even if they don't exist in the database
         const documentWithDefaults = {
           ...data,
+          title: documentTitle,
           favorite: data.favorite || false, // Default to false if not in database
           status: data.status || 'Draft',   // Default to 'Draft' if not in database
         };
         
         setActiveDocument(documentWithDefaults);
-        setTitle(data.title);
-        setContent(data.content);
+        setTitle(documentTitle);
+        setContent(data.content || '');
+        console.log('Document state set with title:', documentTitle);
       } catch (err) {
         console.error('Error fetching document:', err);
         toast({
@@ -258,6 +284,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
         if (isMounted) {
           cleanupRef.current = cleanup || null;
         }
+
+        // No longer monitoring H1 headings for title updates
       } catch (error) {
         console.error('[DocumentEditor] Error setting up todo sync:', error);
         if (isMounted) {
@@ -359,10 +387,57 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
   // Function to handle title changes
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newTitle = e.target.value;
+    console.log('Title changed to:', newTitle);
     setTitle(newTitle);
     
-    // Mark as having pending changes that need to be saved
-    setPendingChanges(true);
+    // Update the active document title as well to show the change immediately
+    if (activeDocument) {
+      console.log('Updating active document title');
+      setActiveDocument({
+        ...activeDocument,
+        title: newTitle
+      });
+    }
+    
+    // Force auto-save after title change with a short delay
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(() => {
+      console.log('Saving document after title change:', newTitle);
+      // Save with the current title value, not relying on state update
+      if (activeDocument) {
+        const documentData = {
+          title: newTitle,
+          content: content,
+          projectId: activeDocument.project_id
+        };
+        if (documentId === 'new') {
+          createDocument(documentData)
+            .then(({ document, error }) => {
+              if (error) console.error('Error creating document:', error);
+              else if (document) {
+                console.log('Document created with title:', document.title);
+                setActiveDocument({
+                  ...document,
+                  favorite: false,
+                  status: 'Draft'
+                });
+                navigate(`/documents/${document.id}`, { replace: true });
+              }
+            });
+        } else {
+          updateDocument(documentId, { title: newTitle })
+            .then(({ document, error }) => {
+              if (error) console.error('Error updating document title:', error);
+              else if (document) {
+                console.log('Document title updated to:', document.title);
+              }
+            });
+        }
+      }
+      setPendingChanges(false);
+    }, 1000);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -396,30 +471,23 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
+            {/* Synced title display - now editable */}
             <input
               type="text"
               value={title}
               onChange={handleTitleChange}
-              className="outline-none text-lg font-medium bg-transparent border-none focus:ring-0 document-title"
-              placeholder="Untitled Document"
+              className="text-lg font-medium bg-transparent border-none outline-none w-full hover:bg-gray-100 focus:bg-gray-100 px-2 py-1 rounded transition-colors"
+              placeholder="Enter document title"
             />
-            <div className="text-sm text-muted-foreground flex gap-2">
-              {activeDocument ? (
-                <>
-                  {activeDocument.updated_at && (
-                    <span>
-                      Last edited {formatDate(new Date(activeDocument.updated_at))}
-                    </span>
-                  )}
-                </>
-              ) : null}
+            <div className="text-xs text-muted-foreground">
+              Document title
             </div>
           </div>
         </div>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
-            onClick={handleSave}
+            onClick={() => handleSave()}
             disabled={saving}
             className="text-sm"
           >
@@ -524,7 +592,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
             <Button 
               variant="ghost" 
               size="icon" 
-              className={`format-button ${editor?.isActive('code') ? 'active' : ''}`} 
+              className={`format-button ${editor?.isActive('code') ? 'active' : ''}`}
               onClick={handleCodeBlock}
             >
               <Code className="h-4 w-4" />

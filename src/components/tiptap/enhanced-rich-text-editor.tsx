@@ -94,6 +94,10 @@ export const EnhancedRichTextEditor = React.forwardRef<HTMLDivElement, EnhancedR
           bold: false,
           italic: false,
           heading: false,
+          strike: false,
+          code: false,
+          codeBlock: false,
+          blockquote: false,
         }) as Extension,
         ...(props.enableTodos ? [TodoExtension.configure({
           HTMLAttributes: {

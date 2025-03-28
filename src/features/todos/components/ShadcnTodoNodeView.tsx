@@ -92,151 +92,214 @@ export const ShadcnTodoNodeView = (props: NodeViewProps) => {
     setIsChecked(checked);
     setLoading(true);
     
-    // Update node attributes
-    updateAttributes({
-      completed: checked,
-      updatedAt: new Date().toISOString(),
-    });
-    
-    // Dispatch custom event for external handlers
-    const event = new CustomEvent('todoToggle', { 
-      detail: { id, completed: checked } 
-    });
-    document.dispatchEvent(event);
-    
-    setLoading(false);
+    // Use setTimeout to defer updates
+    setTimeout(() => {
+      try {
+        // Update node attributes
+        updateAttributes({
+          completed: checked,
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Dispatch custom event for external handlers
+        const event = new CustomEvent('todoToggle', { 
+          detail: { id, completed: checked } 
+        });
+        document.dispatchEvent(event);
+      } catch (error) {
+        console.error('Error toggling todo:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, 0);
   };
 
   const handleDateSelect = (date: Date | undefined) => {
     setSelectedDate(date);
     setIsDueDateOpen(false);
+    setLoading(true);
     
-    if (date) {
-      updateAttributes({
-        dueDate: date.toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      
-      // Dispatch event for external handlers
-      const event = new CustomEvent('external-todo-update', { 
-        detail: { id, dueDate: date.toISOString() } 
-      });
-      document.dispatchEvent(event);
-      
-      toast({
-        title: "Due date updated",
-        description: `Due date set to ${format(date, 'PPP')}`,
-      });
-    }
+    // Use setTimeout to defer updates
+    setTimeout(() => {
+      try {
+        if (date) {
+          updateAttributes({
+            dueDate: date.toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          
+          // Dispatch event for external handlers
+          const event = new CustomEvent('external-todo-update', { 
+            detail: { id, dueDate: date.toISOString() } 
+          });
+          document.dispatchEvent(event);
+          
+          toast({
+            title: "Due date updated",
+            description: `Due date set to ${format(date, 'PPP')}`,
+          });
+        }
+      } catch (error) {
+        console.error('Error setting due date:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, 0);
   };
 
   const handleAssigneeSelect = (userId: string) => {
-    updateAttributes({
-      assignedTo: userId || null,
-      updatedAt: new Date().toISOString(),
-    });
+    setLoading(true);
     
-    // Dispatch event for external handlers
-    const event = new CustomEvent('external-todo-update', { 
-      detail: { id, assignedTo: userId || null } 
-    });
-    document.dispatchEvent(event);
-    
-    toast({
-      title: "Task assigned",
-      description: "Task has been assigned successfully",
-    });
+    // Use setTimeout to defer updates
+    setTimeout(() => {
+      try {
+        updateAttributes({
+          assignedTo: userId || null,
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Dispatch event for external handlers
+        const event = new CustomEvent('external-todo-update', { 
+          detail: { id, assignedTo: userId || null } 
+        });
+        document.dispatchEvent(event);
+        
+        toast({
+          title: "Task assigned",
+          description: "Task has been assigned successfully",
+        });
+      } catch (error) {
+        console.error('Error assigning user:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, 0);
   };
 
   const removeDueDate = () => {
     setSelectedDate(undefined);
     setIsDueDateOpen(false);
+    setLoading(true);
     
-    updateAttributes({
-      dueDate: null,
-      updatedAt: new Date().toISOString(),
-    });
-    
-    // Dispatch event for external handlers
-    const event = new CustomEvent('external-todo-update', { 
-      detail: { id, dueDate: null } 
-    });
-    document.dispatchEvent(event);
-    
-    toast({
-      title: "Due date removed",
-      description: "Due date has been removed from this task",
-    });
+    // Use setTimeout to defer updates
+    setTimeout(() => {
+      try {
+        updateAttributes({
+          dueDate: null,
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Dispatch event for external handlers
+        const event = new CustomEvent('external-todo-update', { 
+          detail: { id, dueDate: null } 
+        });
+        document.dispatchEvent(event);
+        
+        toast({
+          title: "Due date removed",
+          description: "Due date has been removed from this task",
+        });
+      } catch (error) {
+        console.error('Error removing due date:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, 0);
   };
 
   // Handle saving edited content
   const handleSaveContent = () => {
-    // We need to replace the node content with the edited content
-    const pos = editor.view.state.selection.from;
+    if (!editedContent.trim()) {
+      setIsEditing(false);
+      return;
+    }
     
-    // Create a transaction to replace the node content
-    const tr = editor.view.state.tr;
+    setLoading(true);
     
-    // Delete existing content
-    editor.commands.focus();
-    editor.commands.command(({ tr, commands }) => {
-      const nodePos = tr.selection.$from.before();
-      // First clear the node's content
-      const node = tr.doc.nodeAt(nodePos);
-      if (node) {
-        tr.deleteRange(nodePos + 1, nodePos + node.nodeSize - 1);
-        // Insert new content as text
-        tr.insertText(editedContent, nodePos + 1);
-        return true;
+    // Use setTimeout to defer the update to avoid React rendering issues
+    setTimeout(() => {
+      try {
+        // Create a transaction to replace the node content
+        editor.commands.focus();
+        editor.commands.command(({ tr, commands }) => {
+          const nodePos = tr.selection.$from.before();
+          // First clear the node's content
+          const node = tr.doc.nodeAt(nodePos);
+          if (node) {
+            tr.deleteRange(nodePos + 1, nodePos + node.nodeSize - 1);
+            // Insert new content as text
+            tr.insertText(editedContent, nodePos + 1);
+            return true;
+          }
+          return false;
+        });
+        
+        // Update additional attributes
+        updateAttributes({
+          content: editedContent,
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Dispatch event for external handlers
+        const event = new CustomEvent('external-todo-update', { 
+          detail: { id, content: editedContent } 
+        });
+        document.dispatchEvent(event);
+        
+        toast({
+          title: "Task updated",
+          description: "Task content has been updated successfully",
+        });
+      } catch (error) {
+        console.error('Error updating content:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update task content",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+        setIsEditing(false);
       }
-      return false;
-    });
-    
-    // Update additional attributes
-    updateAttributes({
-      content: editedContent,
-      updatedAt: new Date().toISOString(),
-    });
-    
-    // Dispatch event for external handlers
-    const event = new CustomEvent('external-todo-update', { 
-      detail: { id, content: editedContent } 
-    });
-    document.dispatchEvent(event);
-    
-    toast({
-      title: "Task updated",
-      description: "Task content has been updated successfully",
-    });
-    
-    setIsEditing(false);
+    }, 0);
   };
 
   // Project selection handler
   const handleProjectSelect = (projectId: string) => {
-    updateAttributes({
-      projectId: projectId === '_none' ? null : projectId,
-      updatedAt: new Date().toISOString(),
-    });
+    setLoading(true);
     
-    // Dispatch event for external handlers
-    const event = new CustomEvent('external-todo-update', { 
-      detail: { id, projectId: projectId === '_none' ? null : projectId } 
-    });
-    document.dispatchEvent(event);
-    
-    // Refresh the todos list to reflect the changes
-    todosContext?.refreshTodos?.();
-    
-    // Get project name for the toast
-    const projectName = todosContext?.projects?.find((p: Project) => p.id === projectId)?.name || 'project';
-    
-    toast({
-      title: "Project assigned",
-      description: projectId === '_none' 
-        ? "Task removed from project" 
-        : `Task assigned to ${projectName}`,
-    });
+    // Use setTimeout to defer updates
+    setTimeout(() => {
+      try {
+        updateAttributes({
+          projectId: projectId === '_none' ? null : projectId,
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Dispatch event for external handlers
+        const event = new CustomEvent('external-todo-update', { 
+          detail: { id, projectId: projectId === '_none' ? null : projectId } 
+        });
+        document.dispatchEvent(event);
+        
+        // Refresh the todos list to reflect the changes
+        todosContext?.refreshTodos?.();
+        
+        // Get project name for the toast
+        const projectName = todosContext?.projects?.find((p: Project) => p.id === projectId)?.name || 'project';
+        
+        toast({
+          title: "Project assigned",
+          description: projectId === '_none' 
+            ? "Task removed from project" 
+            : `Task assigned to ${projectName}`,
+        });
+      } catch (error) {
+        console.error('Error setting project:', error);
+      } finally {
+        setLoading(false);
+      }
+    }, 0);
   };
 
   // Get the current project name

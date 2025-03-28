@@ -233,7 +233,7 @@ export function findTodos(editor: any) {
 }
 
 let lastSyncTime = 0;
-const SYNC_DEBOUNCE_TIME = 1000; // 1 second
+const SYNC_DEBOUNCE_TIME = 3000; // Increased from 1000ms to 3000ms (3 seconds)
 let syncInProgress = false;
 let syncAttempts = 0;
 const MAX_SYNC_ATTEMPTS = 3;
@@ -257,47 +257,67 @@ export function initTodoSync(editor: any, userId: string) {
   const initialSyncTimeout = setTimeout(() => {
     if (!isDestroyed) {
       console.log('[todo-extensions] Starting initial sync...');
-      syncTodosWithDatabase(editor, userId).catch(error => {
-        console.error('[todo-extensions] Error during initial sync:', error);
-      });
+      startSyncProcess(editor, userId);
     }
-  }, 100);
+  }, 1000);
 
-  // Set up an interval to sync todos periodically
-  const syncInterval = setInterval(() => {
+  // Set up an update handler
+  const updateHandler = () => {
     if (!isDestroyed) {
-      syncTodosWithDatabase(editor, userId).catch(error => {
-        console.error('[todo-extensions] Error during periodic sync:', error);
+      startSyncProcess(editor, userId);
+    }
+  };
+
+  // Add the update handler to the editor
+  editor.on('update', updateHandler);
+
+  // Return a cleanup function
+  return () => {
+    isDestroyed = true;
+    clearTimeout(initialSyncTimeout);
+    editor.off('update', updateHandler);
+  };
+}
+
+export function startSyncProcess(editor: any, userId: string) {
+  if (syncInProgress || !editor || !userId) {
+    return;
+  }
+  
+  // Debounce sync calls
+  const now = Date.now();
+  if (now - lastSyncTime < SYNC_DEBOUNCE_TIME) {
+    return;
+  }
+  
+  lastSyncTime = now;
+  syncInProgress = true;
+  syncAttempts++;
+  
+  console.log(`[todo-extensions] Starting sync with userId: ${userId} (attempt ${syncAttempts})`);
+  
+  // Use setTimeout to defer the sync to avoid React rendering issues
+  setTimeout(() => {
+    syncTodosWithDatabase(editor, userId)
+      .then(() => {
+        syncInProgress = false;
+        syncAttempts = 0;
+      })
+      .catch((error) => {
+        console.error('[todo-extensions] Error during sync:', error);
+        syncInProgress = false;
         
-        // If we've had multiple failures, notify the user
-        if (syncAttempts >= MAX_SYNC_ATTEMPTS) {
-          toast({
-            title: "Sync Warning",
-            description: "Having trouble syncing todos. Will retry in a few seconds."
-          });
-          
-          // Reset sync attempts after showing the warning
+        // Retry sync if under max attempts
+        if (syncAttempts < MAX_SYNC_ATTEMPTS) {
+          setTimeout(() => {
+            startSyncProcess(editor, userId);
+          }, SYNC_RETRY_DELAY);
+        } else {
+          console.error(`[todo-extensions] Max sync attempts (${MAX_SYNC_ATTEMPTS}) reached. Giving up.`);
           syncAttempts = 0;
         }
       });
-    }
-  }, 5000); // Sync every 5 seconds
-
-  // Return cleanup function
-  return () => {
-    console.log('[todo-extensions] Cleaning up todo sync...');
-    isDestroyed = true;
-    clearTimeout(initialSyncTimeout);
-    clearInterval(syncInterval);
-    
-    // Perform one final sync
-    if (editor && userId) {
-      console.log('[todo-extensions] Performing final sync before cleanup...');
-      syncTodosWithDatabase(editor, userId).catch(error => {
-        console.error('[todo-extensions] Error during final sync:', error);
-      });
-    }
-  };
+  }, 0);
 }
 
 export async function syncTodosWithDatabase(editor: any, userId: string) {

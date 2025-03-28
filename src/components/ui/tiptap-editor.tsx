@@ -172,6 +172,10 @@ export const TiptapEditor = React.forwardRef<HTMLDivElement, TiptapEditorProps>(
             keepAttributes: true,
           },
           horizontalRule: false,
+          strike: false,
+          code: false,
+          codeBlock: false,
+          blockquote: false,
         }) as Extension,
         Image,
         Link.configure({

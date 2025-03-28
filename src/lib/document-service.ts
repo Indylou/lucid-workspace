@@ -38,52 +38,29 @@ export async function createDocument(data: {
   
   try {
     console.log('Creating document with user ID:', userId);
-    console.log('Document data:', data);
-    console.log('Network request about to be sent to Supabase for document creation');
+    console.log('Document data:', JSON.stringify(data, null, 2));
     
-    // First try with regular authenticated client
+    // Build the document data
+    const documentInsertData = {
+      title: data.title || 'Untitled Document',  // Ensure there's always a title
+      content: data.content || '',
+      project_id: data.projectId || null,
+      created_by: userId
+    };
+    
+    console.log('Document insert data:', JSON.stringify(documentInsertData, null, 2));
+    
+    // Always use the regular authenticated client to ensure RLS applies properly
     const { data: documentData, error } = await supabase
       .from('documents')
-      .insert([
-        {
-          title: data.title,
-          content: data.content,
-          project_id: data.projectId || null,
-          created_by: userId
-        }
-      ])
+      .insert([documentInsertData])
       .select()
       .single();
     
-    console.log('Supabase document creation response received:', { data: documentData, error });
-    
-    // If RLS blocks the insert, try with admin client
-    if (error && (error.message.includes('row-level security') || error.message.includes('permission denied'))) {
-      console.log('Attempting to create document with admin client to bypass RLS');
-      
-      const { data: adminDocumentData, error: adminError } = await adminSupabase
-        .from('documents')
-        .insert([
-          {
-            title: data.title,
-            content: data.content,
-            project_id: data.projectId || null,
-            created_by: userId
-          }
-        ])
-        .select()
-        .single();
-      
-      console.log('Admin Supabase document creation response:', { data: adminDocumentData, error: adminError });
-      
-      if (adminError) {
-        console.error('Error creating document with admin client:', adminError);
-        return { document: null, error: adminError.message };
-      }
-      
-      console.log('Document created successfully with admin client:', adminDocumentData);
-      return { document: adminDocumentData as Document, error: null };
-    }
+    console.log('Supabase document creation response received:', { 
+      data: documentData, 
+      error: error ? error.message : null 
+    });
     
     if (error) {
       console.error('Error creating document:', error);
@@ -129,7 +106,8 @@ export async function updateDocument(id: string, data: {
   }
   
   try {
-    console.log('Updating document:', id);
+    console.log('Updating document with ID:', id);
+    console.log('Update data:', JSON.stringify(data, null, 2));
     
     const updates = {
       ...(data.title !== undefined && { title: data.title }),
@@ -137,6 +115,8 @@ export async function updateDocument(id: string, data: {
       ...(data.projectId !== undefined && { project_id: data.projectId }),
       updated_at: new Date().toISOString()
     };
+    
+    console.log('Final updates to be sent:', JSON.stringify(updates, null, 2));
     
     const { data: documentData, error } = await supabase
       .from('documents')
@@ -158,7 +138,7 @@ export async function updateDocument(id: string, data: {
       return { document: null, error: error.message };
     }
     
-    console.log('Document updated successfully:', documentData);
+    console.log('Document updated successfully, returned data:', documentData);
     return { document: documentData as Document, error: null };
   } catch (err) {
     console.error('Error in updateDocument:', err);
