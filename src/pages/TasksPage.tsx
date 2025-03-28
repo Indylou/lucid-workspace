@@ -224,98 +224,92 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="container mx-auto py-6 max-w-7xl px-4 space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage your tasks and collaborate with team members.
-          </p>
-        </div>
-        
-        <div className="flex gap-3">
-          <Button
-            onClick={() => setShowProjectDialog(true)}
-            variant="outline"
-            size="sm"
-            className="h-9"
-          >
-            New Project
-          </Button>
-          <Button 
-            onClick={() => setShowTaskDialog(true)}
-            size="sm"
-            className="h-9"
-          >
-            <PlusCircle className="mr-1 h-4 w-4" />
-            New Task
-          </Button>
+    <div className="h-full flex flex-col">
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="px-6 py-3 flex items-center justify-between">
+          <h1 className="text-lg font-medium">Tasks</h1>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => setShowProjectDialog(true)}
+              variant="ghost"
+              size="sm"
+              className="h-8"
+            >
+              New Project
+            </Button>
+            <Button 
+              onClick={() => setShowTaskDialog(true)}
+              size="sm"
+              className="h-8"
+            >
+              <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+              New Task
+            </Button>
+          </div>
         </div>
       </div>
-      
-      <div className="flex flex-col md:flex-row gap-6">
-        {/* Filters Column */}
-        <div className="w-full md:w-64 space-y-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Filters</CardTitle>
+
+      <div className="flex-1 px-4 py-3 min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] h-full gap-3">
+          {/* Filters Card */}
+          <Card className="h-auto md:h-full bg-muted/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Filters</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-3 px-2">
               {/* Status Filter */}
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <div className="grid grid-cols-1 gap-2">
+              <div className="space-y-1">
+                <div className="grid grid-cols-1 gap-0.5">
                   <Button
-                    variant={filter === 'all' ? 'default' : 'outline'}
+                    variant={filter === 'all' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setFilter('all')}
-                    className="justify-start"
+                    className="justify-start h-7 px-2 text-xs font-normal"
                   >
-                    <Filter className="mr-2 h-4 w-4" />
+                    <Filter className="mr-2 h-3 w-3" />
                     All Tasks
-                    <Badge className="ml-auto">{filterCounts.all}</Badge>
+                    <Badge variant="secondary" className="ml-auto text-[10px] font-normal px-1.5 py-0">{filterCounts.all}</Badge>
                   </Button>
                   <Button
-                    variant={filter === 'incomplete' ? 'default' : 'outline'}
+                    variant={filter === 'incomplete' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setFilter('incomplete')}
-                    className="justify-start"
+                    className="justify-start h-7 px-2 text-xs font-normal"
                   >
-                    <Clock className="mr-2 h-4 w-4" />
+                    <Clock className="mr-2 h-3 w-3" />
                     In Progress
-                    <Badge className="ml-auto">{filterCounts.incomplete}</Badge>
+                    <Badge variant="secondary" className="ml-auto text-[10px] font-normal px-1.5 py-0">{filterCounts.incomplete}</Badge>
                   </Button>
                   <Button
-                    variant={filter === 'completed' ? 'default' : 'outline'}
+                    variant={filter === 'completed' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setFilter('completed')}
-                    className="justify-start"
+                    className="justify-start h-7 px-2 text-xs font-normal"
                   >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    <CheckCircle2 className="mr-2 h-3 w-3" />
                     Completed
-                    <Badge className="ml-auto">{filterCounts.completed}</Badge>
+                    <Badge variant="secondary" className="ml-auto text-[10px] font-normal px-1.5 py-0">{filterCounts.completed}</Badge>
                   </Button>
                   <Button
-                    variant={filter === 'overdue' ? 'default' : 'outline'}
+                    variant={filter === 'overdue' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setFilter('overdue')}
-                    className="justify-start text-destructive"
+                    className="justify-start h-7 px-2 text-xs font-normal text-destructive"
                   >
-                    <AlertCircle className="mr-2 h-4 w-4" />
+                    <AlertCircle className="mr-2 h-3 w-3" />
                     Overdue
-                    <Badge variant="destructive" className="ml-auto">{filterCounts.overdue}</Badge>
+                    <Badge variant="destructive" className="ml-auto text-[10px] font-normal px-1.5 py-0">{filterCounts.overdue}</Badge>
                   </Button>
                 </div>
               </div>
               
               {/* Project Filter */}
-              <div className="space-y-2">
-                <Label>Project</Label>
+              <div className="space-y-1">
                 <Select
                   value={selectedProject || 'all'}
                   onValueChange={(value: string) => setSelectedProject(value === 'all' ? null : value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="h-7 text-xs font-normal bg-background">
                     <SelectValue placeholder="All Projects" />
                   </SelectTrigger>
                   <SelectContent>
@@ -330,20 +324,19 @@ export default function TasksPage() {
               </div>
               
               {/* Assigned To Filter */}
-              <div className="space-y-2">
-                <Label>Assigned To</Label>
+              <div className="space-y-1">
                 <Select
                   value={userFilter || 'all'}
                   onValueChange={value => setUserFilter(value === 'all' ? null : value)}
                 >
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="h-7 text-xs font-normal bg-background">
                     <SelectValue placeholder="Filter by User" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Users</SelectItem>
                     <SelectItem value={user?.id || '_self'}>
                       <div className="flex items-center">
-                        <span className="ml-2">Me</span>
+                        <span>Me</span>
                       </div>
                     </SelectItem>
                     {users
@@ -351,7 +344,7 @@ export default function TasksPage() {
                       .map(u => (
                         <SelectItem key={u.id} value={u.id}>
                           <div className="flex items-center">
-                            <span className="ml-2">{u.name || u.email}</span>
+                            <span>{u.name || u.email}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -359,11 +352,11 @@ export default function TasksPage() {
                 </Select>
               </div>
             </CardContent>
-            <CardFooter>
+            <CardFooter className="px-2 pb-2">
               <Button 
                 variant="ghost" 
                 size="sm"
-                className="w-full"
+                className="w-full h-7 text-xs font-normal"
                 onClick={() => {
                   setFilter('all');
                   setSelectedProject(null);
@@ -375,72 +368,53 @@ export default function TasksPage() {
               </Button>
             </CardFooter>
           </Card>
-        </div>
-        
-        {/* Tasks Column */}
-        <div className="flex-1">
-          <Card className="h-full">
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-center">
-                <CardTitle>
-                  {selectedProject 
-                    ? getProjectNameById(selectedProject) 
-                    : filter === 'all' 
-                      ? 'All Tasks' 
-                      : filter === 'completed' 
-                        ? 'Completed Tasks' 
-                        : filter === 'incomplete'
-                          ? 'In-Progress Tasks'
-                          : 'Overdue Tasks'
-                  }
-                </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8" 
-                    onClick={refreshTodos}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <svg 
-                        xmlns="http://www.w3.org/2000/svg" 
-                        width="24" 
-                        height="24" 
-                        viewBox="0 0 24 24" 
-                        fill="none" 
-                        stroke="currentColor" 
-                        strokeWidth="2" 
-                        strokeLinecap="round" 
-                        strokeLinejoin="round" 
-                        className="h-4 w-4"
-                      >
-                        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                        <path d="M3 4v4h4"></path>
-                        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
-                        <path d="M16 16h4v4"></path>
-                      </svg>
-                    )}
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2 mt-2">
+
+          {/* Tasks Column */}
+          <Card className="h-auto md:h-full">
+            <CardHeader className="flex-none pb-2">
+              <div className="flex items-center gap-3">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     type="search"
                     placeholder="Search tasks..."
-                    className="pl-8"
+                    className="pl-7 h-7 text-xs"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7" 
+                  onClick={refreshTodos}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      width="24" 
+                      height="24" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      className="h-3.5 w-3.5"
+                    >
+                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                      <path d="M3 4v4h4"></path>
+                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                      <path d="M16 16h4v4"></path>
+                    </svg>
+                  )}
+                </Button>
               </div>
               
-              <CardDescription className="pt-1">
+              <CardDescription className="text-[10px] text-muted-foreground mt-1.5">
                 {filteredTodos.length} {filteredTodos.length === 1 ? 'task' : 'tasks'} {
                   filter === 'all' 
                     ? '' 
@@ -452,46 +426,33 @@ export default function TasksPage() {
                 }
               </CardDescription>
             </CardHeader>
-            
-            <CardContent>
+
+            <CardContent className="flex-1 min-h-0">
               {loading ? (
-                <div className="py-8 flex items-center justify-center text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Loading tasks...
+                <div className="h-full flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               ) : filteredTodos.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  <div className="mx-auto w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-3">
-                    <CheckCircle2 className="h-5 w-5" />
-                  </div>
-                  <p>No tasks found</p>
-                  <p className="text-sm">
-                    {searchQuery 
-                      ? "Try adjusting your search or filters."
-                      : "Create a new task to get started."}
-                  </p>
+                <div className="h-full flex flex-col items-center justify-center text-center">
+                  <CheckCircle2 className="h-8 w-8 text-muted-foreground mb-3 opacity-20" />
+                  <p className="text-xs font-medium">No tasks found</p>
                   <Button 
+                    onClick={() => setShowTaskDialog(true)} 
                     variant="outline" 
-                    size="sm" 
-                    className="mt-4"
-                    onClick={() => setShowTaskDialog(true)}
+                    size="sm"
+                    className="mt-3 h-7 text-xs"
                   >
-                    <PlusCircle className="mr-1 h-4 w-4" />
-                    New Task
+                    <PlusCircle className="mr-1.5 h-3 w-3" />
+                    Create a task
                   </Button>
                 </div>
               ) : (
-                <ScrollArea className="h-[calc(100vh-16rem)] py-1">
-                  <div className="space-y-3 pr-3">
+                <ScrollArea className="h-full -mx-6">
+                  <div className="space-y-1 px-6">
                     {filteredTodos.map((todo) => (
                       <EnhancedTodoItem
                         key={todo.id}
-                        id={todo.id}
-                        content={todo.content}
-                        completed={todo.completed}
-                        dueDate={todo.dueDate}
-                        assignedTo={todo.assignedTo}
-                        projectId={todo.projectId}
+                        {...todo}
                         users={users}
                         onUpdate={async (id, data) => {
                           const todoData: TodoItem = {
@@ -521,13 +482,13 @@ export default function TasksPage() {
         </div>
       </div>
 
+      {/* Dialogs */}
       <ProjectDialog
         open={showProjectDialog}
         onOpenChange={setShowProjectDialog}
         onSuccess={handleProjectSuccess}
       />
 
-      {/* Task Creation Dialog */}
       <Dialog open={showTaskDialog} onOpenChange={setShowTaskDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

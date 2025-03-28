@@ -71,6 +71,25 @@ export interface Document {
   updated_at: string;
 }
 
+export interface Milestone {
+  id: string
+  title: string
+  date: string
+  description?: string
+  project_id?: string
+  created_by: string
+  created_at: string
+  updated_at: string
+  todo_id?: string // Optional reference to a todo item
+  type: 'milestone' | 'reminder'
+}
+
+export type MilestoneCreate = Omit<Milestone, 'id' | 'created_at' | 'updated_at'> & {
+  id?: string
+  created_at?: string
+  updated_at?: string
+}
+
 export interface Database {
   public: {
     Tables: {

@@ -10,7 +10,8 @@ import {
   Clock,
   X,
   AlertCircle,
-  Loader2
+  Loader2,
+  Flag
 } from 'lucide-react'
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, getDay, isToday, isSameDay, parseISO, isAfter, isBefore, endOfDay, formatISO } from 'date-fns'
 import { Badge } from '../ui/badge'
@@ -30,26 +31,31 @@ import { v4 as uuidv4 } from 'uuid'
 import { toast } from '../ui/use-toast'
 import { TodoItemAttributes, getUserTodos } from '../../features/todos/lib'
 import { supabase } from '../../lib/supabase'
+import { Textarea } from '../ui/textarea'
+import type { Milestone } from '../../lib/supabase'
+import { Checkbox } from '../ui/checkbox'
 
-// Event type for calendar
-interface CalendarEvent {
+// Calendar item type that can be either a todo or milestone
+interface CalendarItem {
   id: string
   title: string
   date: Date
-  type: 'task' | 'event' | 'reminder'
+  type: 'todo' | 'milestone' | 'reminder'
+  description?: string
   completed?: boolean
-  taskId?: string
+  todoId?: string
+  projectId?: string
 }
 
 export function CalendarModule() {
   const { user } = useAuth()
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [events, setEvents] = useState<CalendarEvent[]>([])
+  const [calendarItems, setCalendarItems] = useState<CalendarItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
 
-  // Fetch events and tasks for the calendar
+  // Fetch calendar items (todos with due dates and milestones)
   useEffect(() => {
     const fetchCalendarData = async () => {
       setIsLoading(true)
@@ -59,66 +65,70 @@ export function CalendarModule() {
           throw new Error('User not authenticated')
         }
         
-        // Get the first and last day of the current month view
-        // Add buffer dates to include tasks from adjacent months that might be displayed
+        // Get the date range for the calendar view (with buffer)
         const monthStart = startOfMonth(currentMonth)
         const monthEnd = endOfMonth(currentMonth)
-        const firstDayDisplay = subMonths(monthStart, 1) // Get from previous month
-        const lastDayDisplay = addMonths(monthEnd, 1) // Get through next month
+        const firstDayDisplay = subMonths(monthStart, 1)
+        const lastDayDisplay = addMonths(monthEnd, 1)
         
         // Format dates for Supabase query
         const startDateISO = formatISO(firstDayDisplay)
         const endDateISO = formatISO(lastDayDisplay)
         
-        // Fetch tasks with due dates from Supabase 
-        const { data: tasks, error: tasksError } = await supabase
+        // Fetch todos with due dates
+        const { data: todos, error: todosError } = await supabase
           .from('todos')
           .select('*')
-          .eq('user_id', user.id)
-          .not('due_date', 'is', null);
+          .or(`created_by.eq.${user.id},assigned_to.eq.${user.id}`)
+          .not('due_date', 'is', null)
+          .gte('due_date', startDateISO)
+          .lte('due_date', endDateISO)
         
-        if (tasksError) {
-          throw new Error(tasksError.message)
+        if (todosError) {
+          throw new Error(todosError.message)
         }
         
-        // Convert tasks with due dates to calendar events
-        const taskEvents: CalendarEvent[] = tasks
-          .map(task => ({
-            id: `task-${task.id}`,
-            title: task.content || 'Untitled Task',
-            date: parseISO(task.due_date),
-            type: 'task',
-            completed: task.completed,
-            taskId: task.id
-          }))
+        // Convert todos to calendar items
+        const todoItems: CalendarItem[] = (todos || []).map(todo => ({
+          id: `todo-${todo.id}`,
+          title: todo.content || 'Untitled Task',
+          date: parseISO(todo.due_date),
+          type: 'todo',
+          completed: todo.completed,
+          todoId: todo.id,
+          projectId: todo.project_id
+        }))
         
-        // Fetch calendar events from Supabase 'calendar_events' table
-        const { data: calendarEvents, error: eventsError } = await supabase
-          .from('calendar_events')
+        // Fetch milestones
+        const { data: milestones, error: milestonesError } = await supabase
+          .from('milestones')
           .select('*')
-          .eq('creator_id', user.id)
+          .eq('created_by', user.id)
           .gte('date', startDateISO)
           .lte('date', endDateISO)
         
-        if (eventsError) {
-          console.error('Error fetching calendar events:', eventsError)
-          // Don't throw here - we can still show task events even if event fetch fails
+        if (milestonesError) {
+          throw new Error(milestonesError.message)
         }
         
-        // Convert calendar events to our format
-        const regularEvents: CalendarEvent[] = (calendarEvents || []).map(event => ({
-          id: event.id,
-          title: event.title,
-          date: parseISO(event.date),
-          type: event.type || 'event'
+        // Convert milestones to calendar items
+        const milestoneItems: CalendarItem[] = (milestones || []).map(milestone => ({
+          id: `milestone-${milestone.id}`,
+          title: milestone.title,
+          date: parseISO(milestone.date),
+          type: milestone.type === 'reminder' ? 'reminder' : 'milestone',
+          description: milestone.description,
+          todoId: milestone.todo_id,
+          projectId: milestone.project_id
         }))
         
-        // Combine both types of events
-        setEvents([...taskEvents, ...regularEvents])
+        // Combine all items
+        setCalendarItems([...todoItems, ...milestoneItems])
         
       } catch (error) {
         console.error('Error fetching calendar data:', error)
         toast({
+          variant: "destructive",
           title: 'Error loading calendar',
           description: error instanceof Error ? error.message : 'An unexpected error occurred',
         })
@@ -145,57 +155,70 @@ export function CalendarModule() {
     setCurrentMonth(new Date())
   }
 
-  // Handle creating a new event
-  const handleCreateEvent = async (eventData: { title: string; date: string; time: string; type: 'event' | 'reminder' }) => {
+  // Create new milestone
+  const handleCreateMilestone = async (data: { 
+    title: string
+    date: string
+    time: string
+    type: 'milestone' | 'reminder'
+    description?: string
+    todoId?: string
+  }) => {
     try {
       if (!user) {
         throw new Error('User not authenticated')
       }
       
       // Combine date and time
-      const dateTime = `${eventData.date}T${eventData.time || '00:00'}:00`
-      const eventDate = new Date(dateTime)
+      const dateTime = data.time 
+        ? `${data.date}T${data.time}:00` 
+        : `${data.date}T00:00:00`
       
-      // Create event in Supabase
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .insert([
-          {
-            title: eventData.title,
-            date: formatISO(eventDate),
-            type: eventData.type,
-            creator_id: user.id,
-            created_at: formatISO(new Date())
-          }
-        ])
+      const milestoneDate = new Date(dateTime)
+      
+      // Create milestone in Supabase
+      const { data: milestone, error } = await supabase
+        .from('milestones')
+        .insert({
+          title: data.title,
+          date: formatISO(milestoneDate),
+          type: data.type,
+          description: data.description,
+          todo_id: data.todoId,
+          created_by: user.id,
+          created_at: formatISO(new Date())
+        })
         .select()
         .single()
       
       if (error) {
-        throw new Error(error.message)
+        throw error
       }
       
-      // Add new event to local state
-      const newEvent: CalendarEvent = {
-        id: data.id,
-        title: data.title,
-        date: parseISO(data.date),
-        type: data.type
+      // Add new milestone to local state
+      const newItem: CalendarItem = {
+        id: `milestone-${milestone.id}`,
+        title: milestone.title,
+        date: parseISO(milestone.date),
+        type: milestone.type === 'reminder' ? 'reminder' : 'milestone',
+        description: milestone.description,
+        todoId: milestone.todo_id
       }
       
-      setEvents(prevEvents => [...prevEvents, newEvent])
+      setCalendarItems(prev => [...prev, newItem])
       setCreateDialogOpen(false)
       
       toast({
-        title: 'Event created',
-        description: 'Your event has been added to the calendar'
+        title: 'Success!',
+        description: `${data.type === 'reminder' ? 'Reminder' : 'Milestone'} has been added to your calendar`
       })
       
     } catch (error) {
-      console.error('Error creating event:', error)
+      console.error('Error creating milestone:', error)
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create event'
+        variant: "destructive",
+        title: 'Error creating milestone',
+        description: error instanceof Error ? error.message : 'Failed to create milestone'
       })
     }
   }
@@ -243,7 +266,7 @@ export function CalendarModule() {
   
   // Get events for a specific day
   const getEventsForDay = (date: Date) => {
-    return events.filter(event => isSameDay(event.date, date))
+    return calendarItems.filter(item => isSameDay(item.date, date))
   }
 
   // Handle day click
@@ -253,18 +276,18 @@ export function CalendarModule() {
   }
 
   // Get upcoming events (next 7 days)
-  const upcomingEvents = events
-    .filter(event => {
+  const upcomingEvents = calendarItems
+    .filter(item => {
       const today = new Date()
       const oneWeekFromNow = addMonths(today, 1) // Show events up to a month ahead
-      return isAfter(event.date, today) && isBefore(event.date, oneWeekFromNow)
+      return isAfter(item.date, today) && isBefore(item.date, oneWeekFromNow)
     })
     .sort((a, b) => a.date.getTime() - b.date.getTime())
     .slice(0, 5) // Limit to 5 events
 
   return (
-    <div className="max-w-7xl mx-auto py-6 px-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-6 py-4">
         <div>
           <h1 className="text-3xl font-bold">Calendar</h1>
         </div>
@@ -272,47 +295,30 @@ export function CalendarModule() {
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
-              Create Event
+              Add Milestone
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
-            <CreateEventDialog 
+            <CreateMilestoneDialog 
               selectedDate={selectedDay || new Date()}
-              onSubmit={handleCreateEvent}
+              onSubmit={handleCreateMilestone}
               onCancel={() => setCreateDialogOpen(false)}
             />
           </DialogContent>
         </Dialog>
       </div>
       
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <h2 className="text-xl font-semibold">
-                {format(currentMonth, 'MMMM yyyy')}
-              </h2>
-              <Button variant="outline" size="icon" onClick={handleNextMonth}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button variant="outline" onClick={handleToday}>
-              Today
-            </Button>
-          </div>
-          
+      <div className="flex-1 px-6 pb-6 min-h-0">
+        <div className="h-full flex flex-col">
           {isLoading ? (
-            <div className="flex items-center justify-center h-[500px]">
+            <div className="flex-1 flex items-center justify-center">
               <Loader2 className="animate-spin h-8 w-8 text-primary" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <div className="flex flex-col h-full space-y-4">
               {/* Main Calendar */}
-              <Card className="lg:col-span-3">
-                <CardContent className="p-0">
+              <Card className="flex-1 min-h-0">
+                <CardContent className="p-0 h-full flex flex-col">
                   {/* Calendar Header */}
                   <div className="flex items-center justify-between p-4 border-b">
                     <div className="flex items-center gap-2">
@@ -334,7 +340,7 @@ export function CalendarModule() {
                   </div>
                   
                   {/* Calendar Grid */}
-                  <div>
+                  <div className="flex-1 min-h-0 overflow-auto">
                     {/* Day Names */}
                     <div className="grid grid-cols-7 text-center text-xs text-muted-foreground font-medium py-2 border-b">
                       <div>Sun</div>
@@ -347,7 +353,7 @@ export function CalendarModule() {
                     </div>
                     
                     {/* Calendar Days */}
-                    <div className="grid grid-cols-7 auto-rows-fr">
+                    <div className="grid grid-cols-7">
                       {calendarDays.map((day, i) => {
                         const eventsForDay = getEventsForDay(day)
                         const isCurrentMonth = isSameMonth(day, currentMonth)
@@ -356,7 +362,7 @@ export function CalendarModule() {
                         return (
                           <div 
                             key={i} 
-                            className={`min-h-[80px] border-b border-r p-1 ${
+                            className={`h-24 border-b border-r p-1 ${
                               isCurrentMonth ? '' : 'text-muted-foreground/40 bg-muted/30'
                             } ${
                               isToday ? 'bg-primary/5' : ''
@@ -379,17 +385,17 @@ export function CalendarModule() {
                             
                             {/* Display first two events for the day */}
                             <div className="mt-1 space-y-1 overflow-hidden max-h-[52px]">
-                              {eventsForDay.slice(0, 2).map(event => (
+                              {eventsForDay.slice(0, 2).map(item => (
                                 <div 
-                                  key={event.id} 
+                                  key={item.id} 
                                   className={`text-xs truncate rounded-sm px-1.5 py-0.5 ${
-                                    event.type === 'event' ? 'bg-blue-100 text-blue-800' :
-                                    event.type === 'reminder' ? 'bg-amber-100 text-amber-800' :
-                                    event.type === 'task' && event.completed ? 'bg-green-100 text-green-800 line-through' :
-                                    'bg-red-100 text-red-800'
-                                  }`}
-                                >
-                                  {event.title}
+                                    item.type === 'milestone' ? 'bg-[#8B5CF6] text-white' :
+                                    item.type === 'reminder' ? 'bg-amber-100 text-amber-800' :
+                                    item.type === 'todo' && item.completed ? 'bg-muted text-muted-foreground line-through' :
+                                    'bg-card hover:bg-muted/50 text-foreground'
+                                  }`}>
+                                  {item.type === 'milestone' && <Flag className="h-3 w-3 inline mr-1" />}
+                                  {item.title}
                                 </div>
                               ))}
                               
@@ -406,15 +412,15 @@ export function CalendarModule() {
                   </div>
                 </CardContent>
               </Card>
-              
+
               {/* Upcoming Events */}
-              <Card>
-                <CardContent className="p-4">
+              <Card className="h-[200px]">
+                <CardContent className="h-full p-4 overflow-auto">
                   <h3 className="text-lg font-medium mb-4">Upcoming...</h3>
                   
                   {upcomingEvents.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <CalendarIcon className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
+                    <div className="h-[calc(100%-2rem)] flex flex-col items-center justify-center">
+                      <CalendarIcon className="h-10 w-10 text-muted-foreground/40 mb-3" />
                       <p className="text-muted-foreground">nothing yet!</p>
                       <Button 
                         variant="outline" 
@@ -431,25 +437,25 @@ export function CalendarModule() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {upcomingEvents.map(event => (
-                        <div key={event.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50">
+                      {upcomingEvents.map(item => (
+                        <div key={item.id} className="flex items-start gap-2 p-2 rounded-md hover:bg-muted/50">
                           <div className={`mt-0.5 rounded-full w-3 h-3 ${
-                            event.type === 'event' ? 'bg-blue-500' :
-                            event.type === 'reminder' ? 'bg-amber-500' :
-                            event.type === 'task' && event.completed ? 'bg-green-500' :
-                            'bg-red-500'
+                            item.type === 'milestone' ? 'bg-[#8B5CF6]' :
+                            item.type === 'reminder' ? 'bg-amber-500' :
+                            item.type === 'todo' && item.completed ? 'bg-muted' :
+                            'bg-card'
                           }`} />
                           <div className="flex-1">
                             <p className={`text-sm font-medium ${
-                              event.type === 'task' && event.completed ? 'line-through text-muted-foreground' : ''
+                              item.type === 'todo' && item.completed ? 'line-through text-muted-foreground' : ''
                             }`}>
-                              {event.title}
+                              {item.title}
                             </p>
                             <div className="flex items-center text-xs text-muted-foreground">
                               <Clock className="mr-1 h-3 w-3" />
-                              {format(event.date, 'MMM d, yyyy')}
-                              {event.type === 'task' && (
-                                <span className="ml-2 bg-red-100 text-red-800 rounded-full text-xs px-2">Task</span>
+                              {format(item.date, 'MMM d, yyyy')}
+                              {item.type === 'todo' && (
+                                <span className="ml-2 bg-card text-foreground rounded-full text-xs px-2">Task</span>
                               )}
                             </div>
                           </div>
@@ -466,7 +472,7 @@ export function CalendarModule() {
                         }}
                       >
                         <Plus className="h-4 w-4 mr-1" />
-                        Create Event
+                        add new
                       </Button>
                     </div>
                   )}
@@ -474,130 +480,169 @@ export function CalendarModule() {
               </Card>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }
 
 // Dialog for creating a new event
-function CreateEventDialog({
+function CreateMilestoneDialog({
   selectedDate,
   onSubmit,
   onCancel
 }: {
   selectedDate: Date
-  onSubmit: (data: { title: string; date: string; time: string; type: 'event' | 'reminder' }) => void
+  onSubmit: (data: { title: string; date: string; time: string; type: 'milestone' | 'reminder'; description?: string; todoId?: string }) => void
   onCancel: () => void
 }) {
+  const { user } = useAuth()
   const [title, setTitle] = useState('')
   const [date, setDate] = useState(format(selectedDate, 'yyyy-MM-dd'))
   const [time, setTime] = useState('')
-  const [type, setType] = useState<'event' | 'reminder'>('event')
+  const [type, setType] = useState<'milestone' | 'reminder'>('milestone')
+  const [description, setDescription] = useState('')
+  const [createTodo, setCreateTodo] = useState(false)
   const [error, setError] = useState('')
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!title.trim()) {
       setError('Title is required')
       return
     }
+
+    let todoId: string | undefined = undefined
+    
+    if (createTodo) {
+      // Create an associated todo
+      const { data: todo, error: todoError } = await supabase
+        .from('todos')
+        .insert({
+          content: title,
+          due_date: `${date}T${time || '00:00'}:00`,
+          created_by: user?.id,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (todoError) {
+        setError('Failed to create associated todo')
+        return
+      }
+      
+      todoId = todo.id
+    }
     
     onSubmit({
       title,
       date,
       time,
-      type
+      type,
+      description,
+      todoId
     })
   }
   
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Create New Event</DialogTitle>
-        <DialogDescription>
-          Add a new event or reminder to your calendar
+      <DialogHeader className="space-y-2 pb-4">
+        <DialogTitle>Create New Milestone</DialogTitle>
+        <DialogDescription className="text-sm text-muted-foreground">
+          Add a new milestone or reminder to your calendar
         </DialogDescription>
       </DialogHeader>
       
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-800 text-sm rounded-md p-3 mb-4 flex items-center">
-            <AlertCircle className="h-4 w-4 mr-2" />
+          <div className="text-sm text-red-500 flex items-center gap-2">
+            <AlertCircle className="h-4 w-4" />
             {error}
           </div>
         )}
         
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label htmlFor="title">Title</Label>
+        <div className="space-y-3">
+          <div>
             <Input 
-              id="title" 
-              placeholder="Event title"
+              placeholder="Milestone title"
               value={title}
               onChange={e => setTitle(e.target.value)}
+              className="w-full"
               autoFocus
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input 
-                id="date" 
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="time">Time (optional)</Label>
-              <Input 
-                id="time" 
-                type="time"
-                value={time}
-                onChange={e => setTime(e.target.value)}
-              />
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Input 
+              type="date"
+              value={date}
+              onChange={e => setDate(e.target.value)}
+              className="bg-background"
+            />
+            <Input 
+              type="time"
+              value={time}
+              onChange={e => setTime(e.target.value)}
+              placeholder="Time (optional)"
+              className="bg-background [color-scheme:normal]"
+            />
           </div>
           
-          <div className="space-y-2">
-            <Label>Event Type</Label>
-            <div className="flex gap-4">
-              <div className="flex items-center">
-                <input 
-                  id="type-event" 
-                  type="radio" 
-                  name="event-type" 
-                  value="event"
-                  checked={type === 'event'}
-                  onChange={() => setType('event')}
-                  className="mr-2"
-                />
-                <Label htmlFor="type-event" className="cursor-pointer">Event</Label>
-              </div>
-              <div className="flex items-center">
-                <input 
-                  id="type-reminder" 
-                  type="radio" 
-                  name="event-type" 
-                  value="reminder"
-                  checked={type === 'reminder'}
-                  onChange={() => setType('reminder')}
-                  className="mr-2"
-                />
-                <Label htmlFor="type-reminder" className="cursor-pointer">Reminder</Label>
-              </div>
-            </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant={type === 'milestone' ? 'default' : 'outline'}
+              size="sm"
+              className={`flex-1 ${type === 'milestone' ? 'bg-[#8B5CF6] hover:bg-[#7C3AED]' : ''}`}
+              onClick={() => setType('milestone')}
+            >
+              Milestone
+            </Button>
+            <Button
+              type="button"
+              variant={type === 'reminder' ? 'default' : 'outline'}
+              size="sm"
+              className={`flex-1 ${type === 'reminder' ? 'bg-[#8B5CF6] hover:bg-[#7C3AED]' : ''}`}
+              onClick={() => setType('reminder')}
+            >
+              Reminder
+            </Button>
           </div>
+          
+          {type === 'milestone' && (
+            <div>
+              <Textarea
+                placeholder="Description (optional)"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                className="w-full"
+              />
+            </div>
+          )}
+          
+          {type === 'milestone' && (
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="create-todo"
+                checked={createTodo}
+                onCheckedChange={(checked) => setCreateTodo(checked as boolean)}
+              />
+              <Label htmlFor="create-todo" className="text-sm cursor-pointer">
+                Create an associated todo item
+              </Label>
+            </div>
+          )}
         </div>
         
-        <DialogFooter className="mt-6">
-          <Button type="button" variant="outline" onClick={onCancel}>
+        <DialogFooter className="flex gap-2 pt-2">
+          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit">Create Event</Button>
+          <Button type="submit" size="sm">
+            Create
+          </Button>
         </DialogFooter>
       </form>
     </>
