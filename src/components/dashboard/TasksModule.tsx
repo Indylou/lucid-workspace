@@ -23,7 +23,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useAuth } from '../../App'
 import { supabase, User, Project, adminSupabase } from '../../lib/supabase'
 import {
-  TodoItemAttributes,
+  TodoItem,
   getUserTodos,
   updateTodo,
   createTodo
@@ -38,7 +38,7 @@ import {
 } from "../ui/select"
 
 // Define local versions of the interfaces to avoid type conflicts
-type Task = Omit<TodoItemAttributes, 'completed'> & { 
+type Task = Omit<TodoItem, 'completed'> & { 
   completed: boolean;
   priority?: 'low' | 'medium' | 'high';
   status?: 'todo' | 'in-progress' | 'review' | 'done';
@@ -294,14 +294,15 @@ export function TasksModule() {
       // Create the task in the database using the createTodo function
       const { todo: newTodo, error } = await createTodo({
         content: taskData.content,
-        description: taskData.description,
+        description: taskData.description || null,
         projectId: taskData.projectId,
         assignedTo: taskData.assignedTo,
         dueDate: taskData.dueDate,
-        priority: taskData.priority || 'medium',
         status: taskData.status || 'todo',
+        priority: taskData.priority || 'medium',
         tags: taskData.tags || [],
-        completed: false
+        completed: false,
+        commentsCount: 0
       }, user.id);
       
       if (error) {

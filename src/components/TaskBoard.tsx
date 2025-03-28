@@ -130,16 +130,17 @@ export default function TaskBoard() {
       const todoItem: TodoItem = {
         id: `task-${Date.now()}`,
         content: newTask.content.trim(),
-        description: newTask.description || "",
+        description: newTask.description || null,
         completed: false,
-        status: newTask.status || "todo",
-        priority: newTask.priority || "medium",
+        status: newTask.status || 'todo',
+        priority: newTask.priority || 'medium',
         tags: newTask.tags || [],
         dueDate: newTask.dueDate || null,
         assignedTo: newTask.assignedTo || null,
         projectId: newTask.projectId || null,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        commentsCount: 0
       };
 
       await addTodo(todoItem);
@@ -173,10 +174,11 @@ export default function TaskBoard() {
     if (!editingTask) return;
 
     try {
-      await updateTodo(editingTask);
+      await updateTodo(editingTask.id, editingTask);
       toast({
         title: "Success",
         description: "Task updated successfully",
+        variant: "default"
       });
       setEditingTask(null);
     } catch (error) {
@@ -236,10 +238,11 @@ export default function TaskBoard() {
         updatedAt: new Date().toISOString()
       };
       
-      await updateTodo(updatedTodo);
+      await updateTodo(updatedTodo.id, updatedTodo);
       toast({
         title: "Success",
         description: "Task moved successfully",
+        variant: "default"
       });
     } catch (error) {
       console.error('Error updating task:', error);
@@ -294,7 +297,7 @@ export default function TaskBoard() {
               <Label htmlFor="description">Description</Label>
               <Input
                 id="description"
-                value={newTask.description}
+                value={newTask.description || ''}
                 onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Task description"
               />
@@ -302,8 +305,8 @@ export default function TaskBoard() {
             <div className="grid gap-2">
               <Label htmlFor="priority">Priority</Label>
               <Select
-                value={newTask.priority}
-                onValueChange={(value: TodoItem['priority']) => handleInputChange('priority', value)}
+                value={newTask.priority || ''}
+                onValueChange={(value) => handleInputChange('priority', value as TodoItem['priority'])}
               >
                 <SelectTrigger id="priority">
                   <SelectValue placeholder="Select priority" />
@@ -360,7 +363,7 @@ export default function TaskBoard() {
               <Label htmlFor="edit-description">Description</Label>
               <Input
                 id="edit-description"
-                value={editingTask?.description}
+                value={editingTask?.description || ''}
                 onChange={(e) => setEditingTask(prev => prev ? { ...prev, description: e.target.value } : null)}
                 placeholder="Task description"
               />
@@ -368,9 +371,9 @@ export default function TaskBoard() {
             <div className="grid gap-2">
               <Label htmlFor="edit-priority">Priority</Label>
               <Select
-                value={editingTask?.priority}
-                onValueChange={(value: TodoItem['priority']) => 
-                  setEditingTask(prev => prev ? { ...prev, priority: value } : null)
+                value={editingTask?.priority || ''}
+                onValueChange={(value) => 
+                  setEditingTask(prev => prev ? { ...prev, priority: value as TodoItem['priority'] } : null)
                 }
               >
                 <SelectTrigger id="edit-priority">

@@ -4,7 +4,8 @@ import { Progress } from '../../components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { BarChart, Calendar, CheckCircle, Clock } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
-import { TodoItem, getUserTodos } from '../../lib/todo-service';
+import { getUserTodos } from '../../features/todos/lib/todo-service';
+import type { TodoItem } from '../../types/todo';
 import { Project, getUserProjects, getProjectMetrics } from '../../lib/project-service';
 import { cn } from '../../lib/utils';
 
@@ -51,14 +52,21 @@ export function AnalyticsModule() {
           rate: 0
         };
 
-        todos.forEach((todo: TodoItem) => {
-          completionStats.total++;
-          if (todo.completed) completionStats.completed++;
-          if (todo.due_date && new Date(todo.due_date) < now && !todo.completed) {
-            completionStats.overdue++;
-          }
-        });
+        const overdueTasks = todos.filter(todo => 
+          !todo.completed && 
+          todo.dueDate && 
+          new Date(todo.dueDate) < new Date()
+        ).length;
 
+        const upcomingTasks = todos.filter(todo => 
+          !todo.completed && 
+          todo.dueDate && 
+          new Date(todo.dueDate) > new Date()
+        ).length;
+
+        completionStats.total = todos.length;
+        completionStats.completed = todos.filter(todo => todo.completed).length;
+        completionStats.overdue = overdueTasks;
         completionStats.rate = completionStats.total > 0 
           ? (completionStats.completed / completionStats.total) * 100 
           : 0;

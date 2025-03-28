@@ -94,17 +94,17 @@ export async function createProject(
 export async function getUserProjects(userId?: string): Promise<{ projects: Project[]; error: AppError | null }> {
   try {
     if (!userId) {
-      const { data: session } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       userId = session?.user?.id;
       
       if (!userId) {
         return { 
-          projects: [],
-          error: {
-            type: ErrorType.VALIDATION,
-            message: 'User ID is required to fetch projects',
-            originalError: new Error('Missing userId')
-          }
+          projects: [], 
+          error: { 
+            type: ErrorType.AUTH, 
+            message: 'No user ID available', 
+            originalError: new Error('Missing userId') 
+          } 
         };
       }
     }

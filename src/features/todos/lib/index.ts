@@ -12,7 +12,7 @@ export {
 } from './todo-service';
 
 // Export types
-export type { TodoItemAttributes } from './todo-service';
+export type { TodoItem } from '../../../types/todo';
 
 // Export services
 export * from './todo-service'; 

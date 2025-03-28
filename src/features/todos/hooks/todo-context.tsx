@@ -1,57 +1,42 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { supabase, Project } from '../../../lib/supabase';
-import { TodoItemAttributes, getUserTodos, createTodo as apiCreateTodo, updateTodo as apiUpdateTodo, deleteTodo as apiDeleteTodo, toggleTodoCompletion, assignTodo } from '../lib/todo-service';
+import { getUserTodos, createTodo as apiCreateTodo, updateTodo as apiUpdateTodo, deleteTodo as apiDeleteTodo, toggleTodoCompletion, assignTodo } from '../lib/todo-service';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
 import { useUser } from '../../../lib/user-context';
 import { TodoItem } from '../../../types/todo';
 import { getUserProjects } from '../../../lib/project-service';
 
-export interface TodoItemAttributes {
-  id: string;
-  content: string;
-  description?: string;
-  completed: boolean;
-  priority?: 'low' | 'medium' | 'high';
-  status?: 'todo' | 'in-progress' | 'review' | 'done';
-  tags?: string[];
-  projectId?: string;
-  assignedTo?: string;
-  dueDate?: string;
-  createdAt: string;
-  updatedAt: string;
-  commentsCount?: number;
-}
-
 type TodoContextType = {
-  todos: TodoItemAttributes[];
+  todos: TodoItem[];
   loading: boolean;
   error: AppError | null;
-  userTodos: TodoItemAttributes[];
-  projectTodos: Record<string, TodoItemAttributes[]>;
+  userTodos: TodoItem[];
+  projectTodos: Record<string, TodoItem[]>;
   selectedProject: string | null;
   setSelectedProject: (id: string | null) => void;
   filter: 'all' | 'completed' | 'incomplete' | 'overdue';
   setFilter: (filter: 'all' | 'completed' | 'incomplete' | 'overdue') => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  createTodo: (todo: Omit<TodoItemAttributes, 'id' | 'createdAt' | 'updatedAt'>, userId: string) => Promise<TodoItemAttributes | null>;
-  updateTodoAttributes: (id: string, data: Partial<TodoItemAttributes>) => Promise<TodoItemAttributes | null>;
-  deleteTodoById: (id: string) => Promise<boolean>;
+  createTodo: (todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  updateTodo: (id: string, updates: Partial<TodoItem>) => Promise<void>;
+  deleteTodoById: (id: string) => Promise<void>;
   refreshTodos: () => Promise<void>;
   projects?: Project[];
   addTodo: (todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
-  updateTodo: (todo: TodoItem) => Promise<void>;
   deleteTodo: (id: string) => Promise<void>;
+  toggleComplete: (id: string, completed: boolean) => Promise<void>;
+  assignToUser: (id: string, userId: string | null) => Promise<void>;
 };
 
 const TodoContext = createContext<TodoContextType | undefined>(undefined);
 
 // Helper function to transform database todo objects to frontend format
-export function mapDbTodoToFrontend(dbTodo: any): TodoItemAttributes {
+export function mapDbTodoToFrontend(dbTodo: any): TodoItem {
   return {
     id: dbTodo.id,
     content: dbTodo.content,
-    description: dbTodo.description || "",
+    description: dbTodo.description || null,
     completed: dbTodo.completed || false,
     status: dbTodo.status || 'todo',
     priority: dbTodo.priority || 'medium',
@@ -61,13 +46,13 @@ export function mapDbTodoToFrontend(dbTodo: any): TodoItemAttributes {
     dueDate: dbTodo.due_date,
     createdAt: dbTodo.created_at,
     updatedAt: dbTodo.updated_at,
-    commentsCount: dbTodo.comments_count
+    commentsCount: dbTodo.comments_count || 0
   };
 }
 
 export function TodoProvider({ children }: { children: ReactNode }) {
   const { user } = useUser();
-  const [todos, setTodos] = useState<TodoItemAttributes[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -80,7 +65,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     ? todos.filter(todo => todo.assignedTo === user.id)
     : [];
 
-  const projectTodos: Record<string, TodoItemAttributes[]> = todos.reduce((acc, todo) => {
+  const projectTodos: Record<string, TodoItem[]> = todos.reduce((acc, todo) => {
     if (todo.projectId) {
       if (!acc[todo.projectId]) {
         acc[todo.projectId] = [];
@@ -88,7 +73,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
       acc[todo.projectId].push(todo);
     }
     return acc;
-  }, {} as Record<string, TodoItemAttributes[]>);
+  }, {} as Record<string, TodoItem[]>);
 
   // Fetch todos function 
   const fetchTodos = useCallback(async () => {
@@ -132,70 +117,66 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   // Create a new todo
-  const createTodo = async (todoData: Omit<TodoItemAttributes, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<TodoItemAttributes | null> => {
-    if (!user?.id) return null;
+  const createTodo = async (todoData: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
+    if (!user?.id) return;
     
     try {
-      const { todo: newTodo, error: createError } = await apiCreateTodo(todoData, userId);
+      const todoWithDefaults = {
+        ...todoData,
+        commentsCount: 0
+      };
+      
+      const { todo: newTodo, error: createError } = await apiCreateTodo(todoWithDefaults, user.id);
       
       if (createError || !newTodo) {
         console.error('Error creating todo:', createError);
-        return null;
+        return;
       }
       
       // Update local state
       setTodos(prev => [newTodo, ...prev]);
-      
-      return newTodo;
     } catch (err) {
       console.error('Error in createTodo:', err);
-      return null;
     }
   };
 
   // Update a todo
-  const updateTodoAttributes = async (todoId: string, todoData: Partial<TodoItemAttributes>): Promise<TodoItemAttributes | null> => {
-    if (!user?.id) return null;
+  const updateTodo = async (id: string, updates: Partial<TodoItem>): Promise<void> => {
+    if (!user?.id) return;
     
     try {
-      const { todo: updatedTodo, error: updateError } = await apiUpdateTodo(todoId, todoData);
+      const { todo: updatedTodo, error: updateError } = await apiUpdateTodo(id, updates);
       
       if (updateError || !updatedTodo) {
         console.error('Error updating todo:', updateError);
-        return null;
+        return;
       }
       
       // Update local state
       setTodos(prev => prev.map(todo => 
-        todo.id === todoId ? updatedTodo : todo
+        todo.id === id ? updatedTodo : todo
       ));
-      
-      return updatedTodo;
     } catch (err) {
       console.error('Error in updateTodo:', err);
-      return null;
     }
   };
 
   // Delete a todo
-  const deleteTodoById = async (id: string): Promise<boolean> => {
-    if (!user?.id) return false;
+  const deleteTodoById = async (id: string): Promise<void> => {
+    if (!user?.id) return;
     
     try {
       const { success, error: deleteError } = await apiDeleteTodo(id);
       
       if (deleteError || !success) {
         console.error('Error deleting todo:', deleteError);
-        return false;
+        return;
       }
       
       // Update local state
       setTodos(prev => prev.filter(todo => todo.id !== id));
-      
-      return true;
     } catch (err) {
       console.error('Error in deleteTodo:', err);
-      return false;
     }
   };
 
@@ -234,58 +215,45 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     await fetchTodos();
   };
 
-  // New todo CRUD operations
-  const addTodo = async (todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+  // Toggle todo completion
+  const toggleComplete = async (id: string, completed: boolean): Promise<void> => {
     if (!user?.id) return;
     
     try {
-      const todoData = {
-        content: todo.content,
-        description: todo.description,
-        completed: todo.completed,
-        status: todo.status,
-        priority: todo.priority,
-        tags: todo.tags,
-        projectId: todo.projectId,
-        assignedTo: todo.assignedTo,
-        dueDate: todo.dueDate
-      };
+      const { todo: updatedTodo, error: toggleError } = await toggleTodoCompletion(id, completed);
       
-      await createTodo(todoData, user.id);
+      if (toggleError || !updatedTodo) {
+        console.error('Error toggling todo completion:', toggleError);
+        return;
+      }
+      
+      // Update local state
+      setTodos(prev => prev.map(todo => 
+        todo.id === id ? updatedTodo : todo
+      ));
     } catch (err) {
-      setError(err as AppError);
+      console.error('Error in toggleComplete:', err);
     }
   };
 
-  const updateTodo = async (todo: TodoItem) => {
+  // Assign todo to user
+  const assignToUser = async (id: string, userId: string | null): Promise<void> => {
     if (!user?.id) return;
     
     try {
-      const todoData = {
-        content: todo.content,
-        description: todo.description,
-        completed: todo.completed,
-        status: todo.status,
-        priority: todo.priority,
-        tags: todo.tags,
-        projectId: todo.projectId,
-        assignedTo: todo.assignedTo,
-        dueDate: todo.dueDate
-      };
+      const { todo: updatedTodo, error: assignError } = await assignTodo(id, userId);
       
-      await updateTodoAttributes(todo.id, todoData);
+      if (assignError || !updatedTodo) {
+        console.error('Error assigning todo:', assignError);
+        return;
+      }
+      
+      // Update local state
+      setTodos(prev => prev.map(todo => 
+        todo.id === id ? updatedTodo : todo
+      ));
     } catch (err) {
-      setError(err as AppError);
-    }
-  };
-
-  const deleteTodo = async (id: string) => {
-    if (!user?.id) return;
-    
-    try {
-      await deleteTodoById(id);
-    } catch (err) {
-      setError(err as AppError);
+      console.error('Error in assignToUser:', err);
     }
   };
 
@@ -304,13 +272,14 @@ export function TodoProvider({ children }: { children: ReactNode }) {
         searchQuery,
         setSearchQuery,
         createTodo,
-        updateTodoAttributes,
+        updateTodo,
         deleteTodoById,
         refreshTodos,
         projects,
-        addTodo,
-        updateTodo,
-        deleteTodo
+        addTodo: createTodo,
+        deleteTodo: deleteTodoById,
+        toggleComplete,
+        assignToUser
       }}
     >
       {children}

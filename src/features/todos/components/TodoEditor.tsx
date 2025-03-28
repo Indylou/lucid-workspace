@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card'
 import { TodoEnabledEditor } from './todo-enabled-editor'
-import { getProjectTodos, getUserTodos, TodoItemAttributes } from '../lib/todo-service'
+import { getProjectTodos, getUserTodos } from '../lib/todo-service'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs'
 import { Checkbox } from '../../../components/ui/checkbox'
 import { Separator } from '../../../components/ui/separator'
@@ -36,8 +36,8 @@ export function TodoEditor({
   const [dueDate, setDueDate] = useState<string | null>(initialTodo?.dueDate || null)
   const [assignedTo, setAssignedTo] = useState(initialTodo?.assignedTo || '')
   const [documentTitle, setDocumentTitle] = useState('Untitled Document')
-  const [personalTodos, setPersonalTodos] = useState<TodoItemAttributes[]>([])
-  const [projectTodos, setProjectTodos] = useState<TodoItemAttributes[]>([])
+  const [personalTodos, setPersonalTodos] = useState<TodoItem[]>([])
+  const [projectTodos, setProjectTodos] = useState<TodoItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const editorRef = useRef<any>(null)
   const { addTodo, updateTodo } = useTodoContext()
@@ -96,19 +96,20 @@ export function TodoEditor({
       id: initialTodo?.id || crypto.randomUUID(),
       content: content.trim(),
       completed: initialTodo?.completed || false,
-      dueDate: dueDate || null,
-      assignedTo: assignedTo || null,
-      projectId: projectId || null,
+      dueDate: initialTodo?.dueDate || null,
+      assignedTo: initialTodo?.assignedTo || null,
+      projectId: initialTodo?.projectId || null,
       createdAt: initialTodo?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      description,
-      priority,
-      status,
-      tags,
+      updatedAt: initialTodo?.updatedAt || new Date().toISOString(),
+      description: description || null,
+      priority: priority || 'medium',
+      status: status || 'todo',
+      tags: tags || [],
+      commentsCount: initialTodo?.commentsCount || 0
     }
 
     if (initialTodo) {
-      await updateTodo(todoData)
+      await updateTodo(todoData.id, todoData)
     } else {
       await addTodo(todoData)
     }
@@ -223,7 +224,7 @@ function TaskItem({
   todo,
   onToggleComplete,
 }: {
-  todo: TodoItemAttributes;
+  todo: TodoItem;
   onToggleComplete: (id: string, completed: boolean) => void;
 }) {
   return (

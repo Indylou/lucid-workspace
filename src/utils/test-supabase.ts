@@ -1,7 +1,8 @@
 import { supabase, testAuthAndRLS } from '../lib/supabase';
 import { loginUser, registerUser, checkAuth, signOut } from '../lib/auth-service';
 import { createProject, getUserProjects, updateProject, deleteProject } from '../lib/project-service';
-import { getUserTodos, createTodo, updateTodo, deleteTodo, toggleTodoCompletion, TodoItemAttributes } from '../features/todos/lib/todo-service';
+import { getUserTodos, createTodo, updateTodo, deleteTodo, toggleTodoCompletion } from '../features/todos/lib/todo-service';
+import { TodoItem } from '../types/todo';
 
 // Test connection to Supabase
 export async function testSupabaseConnection() {
@@ -77,7 +78,13 @@ export async function testProjectServices() {
     console.log('Creating test project...');
     const projectName = `Test Project ${Date.now()}`;
     const projectDescription = 'A test project created by the test utility';
-    const createResult = await createProject(projectName, projectDescription);
+    const projectData = {
+      name: projectName,
+      description: projectDescription,
+      status: 'active' as const,
+      priority: 'medium' as const
+    };
+    const createResult = await createProject(projectData);
     
     if (createResult.error || !createResult.project) {
       console.error('❌ Project creation failed:', createResult.error?.message);
@@ -140,7 +147,13 @@ export async function testTodoServices() {
     console.log('Creating test project for todos...');
     const projectName = `Todo Test Project ${Date.now()}`;
     const projectDescription = 'A test project for todo testing';
-    const projectResult = await createProject(projectName, projectDescription);
+    const projectData = {
+      name: projectName,
+      description: projectDescription,
+      status: 'active' as const,
+      priority: 'medium' as const
+    };
+    const projectResult = await createProject(projectData);
     
     if (projectResult.error || !projectResult.project) {
       console.error('❌ Project creation failed:', projectResult.error?.message);
@@ -161,12 +174,17 @@ export async function testTodoServices() {
     
     // Create a test todo
     console.log('Creating test todo...');
-    const todoData: Omit<TodoItemAttributes, 'id' | 'createdAt'> = {
-      content: `Test Todo ${Date.now()}`,
+    const todoData: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'> = {
+      content: 'Test todo',
       completed: false,
       projectId: projectId,
-      dueDate: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-      createdBy: userId
+      dueDate: new Date().toISOString(),
+      assignedTo: userId,
+      description: 'Test description',
+      status: 'todo',
+      priority: 'medium',
+      tags: [],
+      commentsCount: 0
     };
     
     const createResult = await createTodo(todoData, userId);
@@ -192,7 +210,7 @@ export async function testTodoServices() {
     
     // Update the todo
     console.log('Updating test todo...');
-    const todoUpdate: Partial<TodoItemAttributes> = {
+    const todoUpdate: Partial<TodoItem> = {
       content: `Updated Todo ${Date.now()}`,
       completed: false
     };

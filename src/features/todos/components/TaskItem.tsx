@@ -82,7 +82,7 @@ export function TaskItem({ todo, onToggleComplete }: TaskItemProps) {
               <span>{format(new Date(todo.dueDate), 'MMM d')}</span>
             </div>
           )}
-          {todo.commentsCount !== undefined && todo.commentsCount > 0 && (
+          {todo.commentsCount !== undefined && todo.commentsCount !== null && todo.commentsCount > 0 && (
             <div className="flex items-center gap-1">
               <MessageSquare className="h-4 w-4" />
               <span>{todo.commentsCount}</span>

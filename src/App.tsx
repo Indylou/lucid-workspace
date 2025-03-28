@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Route, Routes, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './components/dashboard/DashboardLayout';
 import TodoEditorPage from './pages/TodoEditorPage';
 import { LoginPage } from './pages/LoginPage';
@@ -12,7 +12,6 @@ import { UserProvider } from './components/UserProvider';
 import { useUser } from './lib/user-context';
 import { TodoProvider } from './features/todos/hooks';
 import TestSupabasePage from './pages/test-supabase';
-import './App.css';
 import { ThemeProvider } from './components/theme-provider';
 
 // Create auth context

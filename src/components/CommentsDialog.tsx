@@ -13,7 +13,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Comment } from '../types/todo';
 import { useUser } from '../lib/user-context';
 import { getComments, createComment, updateComment, deleteComment } from '../features/todos/lib/comment-service';
-import { Loader2, ArrowRightCircle, MoreVertical, Pencil, Trash } from 'lucide-react';
+import { Loader2, ArrowUpRight, MoreVertical, Pencil, Trash } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -246,7 +246,7 @@ export function CommentsDialog({ todoId, isOpen, onClose }: CommentsDialogProps)
             className="min-h-[60px]"
           />
           <Button type="submit" size="icon" disabled={!newComment.trim()}>
-            <ArrowRightCircle className="h-4 w-4" />
+            <ArrowUpRight className="h-4 w-4" />
           </Button>
         </form>
       </DialogContent>

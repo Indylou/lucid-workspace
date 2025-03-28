@@ -3,7 +3,7 @@ import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
-import { TodoExtension, TodoOptions } from '../lib/todo-extensions';
+import { TodoExtension } from '../lib/todo-extensions';
 import { useAuth } from '../../../App';
 import { getUserProjects } from '../../../lib/project-service';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
@@ -115,49 +115,61 @@ export function TodoEnabledEditor({ content, onChange, className }: TodoEnabledE
         </div>
       </div>
 
-      <style>{`
-        .todo-item {
-          display: flex;
-          align-items: flex-start;
-          margin: 0.5em 0;
-          padding: 0.5em;
-          border-radius: 0.25em;
-          background-color: var(--background);
-          border: 1px solid var(--border);
-        }
+      <style>
+        {`
+          .ProseMirror {
+            min-height: 200px;
+            padding: 1rem;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+          }
 
-        .todo-item.completed {
-          background-color: var(--muted);
-          text-decoration: line-through;
-          color: var(--muted-foreground);
-        }
+          .ProseMirror:focus {
+            outline: none;
+            border-color: #6366f1;
+          }
 
-        .todo-item input[type="checkbox"] {
-          margin-right: 0.5em;
-          margin-top: 0.25em;
-        }
+          .ProseMirror p {
+            margin: 1em 0;
+            line-height: 1.5;
+          }
 
-        .todo-item .todo-content {
-          flex: 1;
-          min-height: 1.5em;
-        }
+          .ProseMirror p:first-child {
+            margin-top: 0;
+          }
 
-        .ProseMirror {
-          min-height: 200px;
-          padding: 1em;
-          border: 1px solid var(--border);
-          border-radius: 0.5em;
-        }
+          .ProseMirror p:last-child {
+            margin-bottom: 0;
+          }
 
-        .ProseMirror:focus {
-          outline: none;
-          border-color: var(--ring);
-        }
+          .todo-wrapper {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+            padding: 0.25rem 0;
+          }
 
-        .ProseMirror p {
-          margin: 0.5em 0;
-        }
-      `}</style>
+          .todo-wrapper p {
+            margin: 0;
+          }
+
+          .todo-checkbox {
+            flex-shrink: 0;
+            padding-top: 0.125rem;
+          }
+
+          .todo-content {
+            flex: 1;
+            min-width: 0;
+            padding-top: 0.125rem;
+          }
+
+          .todo-content > * {
+            display: inline;
+          }
+        `}
+      </style>
 
       <EditorContent editor={editor} />
     </div>
