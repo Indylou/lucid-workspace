@@ -16,10 +16,14 @@ import { createTodo, updateTodo as updateTodoRecord, deleteTodo } from './todo-s
 export interface TodoAttributes {
   id: string;
   content: string;
+  description?: string | null;
   completed: boolean;
-  assignedTo: string | null;
-  projectId: string | null;
-  dueDate: string | null;
+  priority?: 'low' | 'medium' | 'high' | null;
+  status?: 'todo' | 'in-progress' | 'review' | 'done' | null;
+  tags?: string[] | null;
+  projectId?: string | null;
+  assignedTo?: string | null;
+  dueDate?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -76,6 +80,18 @@ export const TodoExtension = Node.create<TodoOptions>({
       },
       completed: {
         default: false,
+      },
+      description: {
+        default: null,
+      },
+      priority: {
+        default: null,
+      },
+      status: {
+        default: null,
+      },
+      tags: {
+        default: null,
       },
       assignedTo: {
         default: null,

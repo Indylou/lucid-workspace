@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar'
 import { Checkbox } from '../ui/checkbox'
 import { Badge } from '../ui/badge'
-import { PlusCircle, Search, Calendar, CheckCircle, CircleSlash, Clock } from 'lucide-react'
+import { PlusCircle, Search, Calendar, CheckCircle, CircleSlash, Clock, FileText, MessageSquare } from 'lucide-react'
 import { format, isAfter, isBefore, endOfDay } from 'date-fns'
 import { toast } from '../ui/use-toast'
 import {
@@ -28,9 +28,24 @@ import {
   updateTodo,
   createTodo
 } from '../../features/todos/lib'
+import { cn } from '../../lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select"
 
 // Define local versions of the interfaces to avoid type conflicts
-type Task = Omit<TodoItemAttributes, 'completed'> & { completed: boolean };
+type Task = Omit<TodoItemAttributes, 'completed'> & { 
+  completed: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  status?: 'todo' | 'in-progress' | 'review' | 'done';
+  tags?: string[];
+  description?: string;
+  commentsCount?: number;
+};
 
 export function TasksModule() {
   const { user } = useAuth();
@@ -145,6 +160,35 @@ export function TasksModule() {
     }
   };
 
+  // Function to get priority badge color
+  const getPriorityColor = (priority: string = 'medium') => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-500/10 text-red-500';
+      case 'medium':
+        return 'bg-yellow-500/10 text-yellow-500';
+      case 'low':
+        return 'bg-green-500/10 text-green-500';
+      default:
+        return 'bg-gray-500/10 text-gray-500';
+    }
+  };
+
+  // Function to get status badge color
+  const getStatusColor = (status: string = 'todo') => {
+    switch (status) {
+      case 'done':
+        return 'bg-green-500/10 text-green-500';
+      case 'in-progress':
+        return 'bg-blue-500/10 text-blue-500';
+      case 'review':
+        return 'bg-purple-500/10 text-purple-500';
+      case 'todo':
+      default:
+        return 'bg-gray-500/10 text-gray-500';
+    }
+  };
+
   // Filter tasks based on current filters and search query
   const filteredTasks = tasks.filter(task => {
     // Filter by project if selected
@@ -165,9 +209,16 @@ export function TasksModule() {
       return false;
     }
     
-    // Apply search query
-    if (searchQuery && !task.content.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+    // Apply search query to content and description
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const matchesContent = task.content.toLowerCase().includes(searchLower);
+      const matchesDescription = task.description?.toLowerCase().includes(searchLower);
+      const matchesTags = task.tags?.some(tag => tag.toLowerCase().includes(searchLower));
+      
+      if (!matchesContent && !matchesDescription && !matchesTags) {
+        return false;
+      }
     }
     
     return true;
@@ -223,9 +274,13 @@ export function TasksModule() {
   // Function to handle creating a new task
   const handleCreateTask = async (taskData: {
     content: string,
+    description?: string,
     projectId: string | null,
     assignedTo: string | null,
-    dueDate: string | null
+    dueDate: string | null,
+    priority?: 'low' | 'medium' | 'high',
+    status?: 'todo' | 'in-progress' | 'review' | 'done',
+    tags?: string[]
   }) => {
     try {
       if (!user?.id) {
@@ -236,17 +291,17 @@ export function TasksModule() {
         return;
       }
 
-      console.log('[TasksModule] Creating task with user.id:', user.id);
-      console.log('[TasksModule] Task data:', taskData);
-
       // Create the task in the database using the createTodo function
       const { todo: newTodo, error } = await createTodo({
         content: taskData.content,
+        description: taskData.description,
         projectId: taskData.projectId,
         assignedTo: taskData.assignedTo,
         dueDate: taskData.dueDate,
-        completed: false,
-        createdBy: user.id
+        priority: taskData.priority || 'medium',
+        status: taskData.status || 'todo',
+        tags: taskData.tags || [],
+        completed: false
       }, user.id);
       
       if (error) {
@@ -353,296 +408,262 @@ export function TasksModule() {
     };
   }, []);
 
+  const handleCreateTaskSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    const content = formData.get('content') as string;
+    const description = formData.get('description') as string;
+    const priority = formData.get('priority') as 'low' | 'medium' | 'high';
+    const status = formData.get('status') as 'todo' | 'in-progress' | 'review' | 'done';
+    const tags = (formData.get('tags') as string || '')
+      .split(',')
+      .map(tag => tag.trim())
+      .filter(Boolean);
+    const assignedTo = formData.get('assignedTo') as string;
+    const projectId = formData.get('projectId') as string;
+    const dueDate = formData.get('dueDate') as string;
+
+    await handleCreateTask({
+      content,
+      description,
+      priority,
+      status,
+      tags,
+      assignedTo: assignedTo || null,
+      projectId: projectId || null,
+      dueDate: dueDate || null
+    });
+  };
+
+  // Function to handle toggling task completion
+  const handleToggleTask = async (taskId: string) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return;
+
+      const updatedTask = await updateTodo(taskId, {
+        completed: !task.completed
+      });
+
+      if (updatedTask) {
+        setTasks(prevTasks =>
+          prevTasks.map(t =>
+            t.id === taskId ? { ...t, completed: !t.completed } : t
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error toggling task:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update task. Please try again.',
+        variant: 'destructive'
+      });
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Tasks</h1>
-          <p className="text-muted-foreground">Manage and track your tasks across all projects</p>
-        </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Task
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <CreateTaskDialog 
-              projects={projects}
-              users={users}
-              onSubmit={handleCreateTask}
-              onCancel={() => setIsCreateDialogOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
-      </div>
-      
-      <div className="mb-8 flex flex-col md:flex-row md:items-center gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="h-full flex flex-col">
+      {/* Search and filters */}
+      <div className="flex items-center gap-4 p-4 border-b">
+        <div className="flex-1">
           <Input
+            type="search"
+            placeholder="Search tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tasks..."
-            className="pl-10"
+            className="w-full"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Tabs value={filter} onValueChange={(value) => setFilter(value as any)} className="w-auto">
-            <TabsList>
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="incomplete">Incomplete</TabsTrigger>
-              <TabsTrigger value="overdue">Overdue</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          
-          {projects.length > 0 && (
-            <select
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className="border rounded-md px-3 py-1 text-sm bg-background"
-            >
-              <option value="all">All Projects</option>
-              {projects.map(project => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+        <TabsList className="bg-muted">
+          <TabsTrigger value="all" onClick={() => setFilter('all')}>All</TabsTrigger>
+          <TabsTrigger value="completed" onClick={() => setFilter('completed')}>Completed</TabsTrigger>
+          <TabsTrigger value="incomplete" onClick={() => setFilter('incomplete')}>Incomplete</TabsTrigger>
+          <TabsTrigger value="overdue" onClick={() => setFilter('overdue')}>Overdue</TabsTrigger>
+        </TabsList>
       </div>
-      
-      <Card className="mb-6">
-        <CardContent className="p-6">
-          {isLoading ? (
-            <div className="py-8 flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-          ) : filteredTasks.length === 0 ? (
-            <div className="py-16">
-              <div className="text-center">
-                <CheckCircle className="h-12 w-12 text-muted-foreground mb-4 opacity-20 mx-auto" />
-                <p className="text-lg font-medium">No tasks found</p>
-                <p className="text-muted-foreground">Create a new task or adjust your filters</p>
-                <Button 
-                  onClick={() => setIsCreateDialogOpen(true)} 
-                  variant="outline" 
-                  className="mt-4"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Create a task
-                </Button>
+
+      {/* Task list */}
+      <div className="flex-1 overflow-auto p-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {Object.entries(tasksByDueDate).map(([group, tasks]) => (
+              <div key={group}>
+                <h3 className="font-semibold mb-4">{group}</h3>
+                <div className="space-y-2">
+                  {tasks.map((task) => (
+                    <Card key={task.id} className={cn("transition-colors", task.completed && "bg-muted")}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-4">
+                          <Checkbox
+                            checked={task.completed}
+                            onCheckedChange={() => handleToggleTask(task.id)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={cn("text-sm font-medium", task.completed && "line-through text-muted-foreground")}>
+                                {task.content}
+                              </span>
+                              {task.priority && (
+                                <Badge variant="secondary" className={getPriorityColor(task.priority)}>
+                                  {task.priority}
+                                </Badge>
+                              )}
+                              {task.status && (
+                                <Badge variant="secondary" className={getStatusColor(task.status)}>
+                                  {task.status}
+                                </Badge>
+                              )}
+                            </div>
+                            {task.description && (
+                              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                                {task.description}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              {task.dueDate && (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>{format(new Date(task.dueDate), 'MMM d')}</span>
+                                </div>
+                              )}
+                              {task.assignedTo && getUserById(task.assignedTo) && (
+                                <div className="flex items-center gap-1">
+                                  <Avatar className="h-5 w-5">
+                                    <AvatarImage src={getUserById(task.assignedTo)?.avatar_url || ''} />
+                                    <AvatarFallback>{getUserById(task.assignedTo)?.name?.[0]}</AvatarFallback>
+                                  </Avatar>
+                                  <span>{getUserById(task.assignedTo)?.name}</span>
+                                </div>
+                              )}
+                              {task.projectId && getProjectById(task.projectId) && (
+                                <div className="flex items-center gap-1">
+                                  <FileText className="h-4 w-4" />
+                                  <span>{getProjectById(task.projectId)?.name}</span>
+                                </div>
+                              )}
+                              {task.commentsCount !== undefined && task.commentsCount > 0 && (
+                                <div className="flex items-center gap-1">
+                                  <MessageSquare className="h-4 w-4" />
+                                  <span>{task.commentsCount}</span>
+                                </div>
+                              )}
+                            </div>
+                            {task.tags && task.tags.length > 0 && (
+                              <div className="flex items-center gap-2 mt-2">
+                                {task.tags.map((tag, index) => (
+                                  <Badge key={index} variant="secondary" className="bg-primary/10 text-primary">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create task dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Task</DialogTitle>
+            <DialogDescription>Add a new task to your list</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTaskSubmit}>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="content">Task Title</Label>
+                <Input id="content" name="content" required />
+              </div>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Input id="description" name="description" />
+              </div>
+              <div>
+                <Label htmlFor="priority">Priority</Label>
+                <Select name="priority">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select name="status">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todo">Todo</SelectItem>
+                    <SelectItem value="in-progress">In Progress</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                    <SelectItem value="done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="tags">Tags (comma-separated)</Label>
+                <Input id="tags" name="tags" placeholder="feature, bug, design" />
+              </div>
+              <div>
+                <Label htmlFor="assignedTo">Assign To</Label>
+                <Select name="assignedTo">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select user" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="projectId">Project</Label>
+                <Select name="projectId">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input type="date" id="dueDate" name="dueDate" />
               </div>
             </div>
-          ) : (
-            <div className="space-y-8">
-              {/* Group tasks by due date */}
-              {Object.entries(tasksByDueDate).map(([group, groupTasks]) => (
-                <div key={group}>
-                  <div className="flex items-center gap-2 mb-4">
-                    {group === 'Overdue' && <CircleSlash className="h-5 w-5 text-red-500" />}
-                    {group === 'Today' && <Clock className="h-5 w-5 text-orange-500" />}
-                    {group === 'This Week' && <Calendar className="h-5 w-5 text-blue-500" />}
-                    {group === 'Later' && <Calendar className="h-5 w-5 text-gray-500" />}
-                    {group === 'No Due Date' && <Calendar className="h-5 w-5 text-muted-foreground" />}
-                    <h2 className="text-xl font-semibold">{group}</h2>
-                    <Badge variant="outline">{groupTasks.length}</Badge>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {groupTasks.map(task => (
-                      <TaskCard 
-                        key={task.id}
-                        task={task}
-                        user={getUserById(task.assignedTo)}
-                        project={getProjectById(task.projectId)}
-                        onToggleComplete={handleToggleComplete}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <DialogFooter className="mt-4">
+              <Button type="submit">Create Task</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
-}
-
-// TaskCard component for displaying individual tasks
-function TaskCard({ 
-  task, 
-  user, 
-  project,
-  onToggleComplete 
-}: { 
-  task: Task; 
-  user?: User;
-  project?: Project;
-  onToggleComplete: (id: string, completed: boolean) => void;
-}) {
-  return (
-    <Card className="mb-3 overflow-hidden">
-      <CardContent className="p-4">
-        <div className="flex items-start gap-3">
-          <Checkbox 
-            id={`task-${task.id}`}
-            checked={task.completed || false}
-            onCheckedChange={() => onToggleComplete(task.id, !task.completed)}
-            className="mt-1"
-          />
-          
-          <div className="flex-1">
-            <div className={`text-base font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-              {task.content}
-            </div>
-            
-            <div className="flex items-center gap-2 mt-2">
-              {project && (
-                <Badge variant="outline" className="text-xs">
-                  {project.name}
-                </Badge>
-              )}
-              
-              {task.dueDate && (
-                <div className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center ${
-                  isAfter(new Date(), new Date(task.dueDate))
-                    ? 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400'
-                }`}>
-                  <Calendar className="h-3 w-3 mr-1" />
-                  {format(new Date(task.dueDate), 'MMM d, yyyy')}
-                </div>
-              )}
-            </div>
-          </div>
-          
-          {user && (
-            <Avatar className="h-6 w-6">
-              {user.avatar_url ? (
-                <AvatarImage src={user.avatar_url} alt={user.name} />
-              ) : (
-                <AvatarFallback>
-                  {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                </AvatarFallback>
-              )}
-            </Avatar>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-// CreateTaskDialog component
-function CreateTaskDialog({ 
-  projects, 
-  users, 
-  onSubmit, 
-  onCancel 
-}: { 
-  projects: Project[];
-  users: User[];
-  onSubmit: (task: { content: string; projectId: string | null; assignedTo: string | null; dueDate: string | null }) => void;
-  onCancel: () => void;
-}) {
-  const { user: currentUser } = useAuth()
-  const [content, setContent] = useState('')
-  const [projectId, setProjectId] = useState<string | null>(null)
-  const [assignedTo, setAssignedTo] = useState<string | null>(currentUser?.id || null)
-  const [dueDate, setDueDate] = useState<string | null>(null)
-  
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit({
-      content,
-      projectId,
-      assignedTo,
-      dueDate
-    })
-  }
-  
-  return (
-    <form onSubmit={handleSubmit}>
-      <DialogHeader>
-        <DialogTitle>Create New Task</DialogTitle>
-        <DialogDescription>
-          Add a new task to your projects or personal to-do list.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="grid gap-4 py-4">
-        <div className="grid gap-2">
-          <Label htmlFor="task-content">Task Description</Label>
-          <Input
-            id="task-content"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="What needs to be done?"
-            className="col-span-3"
-            required
-          />
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="project">Project</Label>
-          <select
-            id="project"
-            className="rounded-md border border-input h-10 px-3 py-2 bg-background text-sm"
-            value={projectId || ''}
-            onChange={(e) => setProjectId(e.target.value || null)}
-          >
-            <option value="">None (Personal Task)</option>
-            {projects.map(project => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="assigned-to">Assigned To</Label>
-          <select
-            id="assigned-to"
-            className="rounded-md border border-input h-10 px-3 py-2 bg-background text-sm"
-            value={assignedTo || ''}
-            onChange={(e) => setAssignedTo(e.target.value || null)}
-          >
-            <option value="">Unassigned</option>
-            {users.map(user => (
-              <option 
-                key={user.id} 
-                value={user.id}
-              >
-                {user.name} {user.id === currentUser?.id ? '(You)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="due-date">Due Date (Optional)</Label>
-          <Input
-            id="due-date"
-            type="date"
-            value={dueDate || ''}
-            onChange={(e) => setDueDate(e.target.value || null)}
-            className="col-span-3"
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={!content}>
-          Create Task
-        </Button>
-      </DialogFooter>
-    </form>
   )
 } 

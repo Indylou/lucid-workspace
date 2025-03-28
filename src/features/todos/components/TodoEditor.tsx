@@ -10,6 +10,8 @@ import { Input } from '../../../components/ui/input'
 import { Button } from '../../../components/ui/button'
 import { TodoItem } from '../../../types/todo'
 import { useTodoContext } from '../hooks/todo-context'
+import { Textarea } from '../../../components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select'
 
 interface TodoEditorProps {
   projectId?: string
@@ -27,7 +29,11 @@ export function TodoEditor({
   onCancel,
 }: TodoEditorProps) {
   const [content, setContent] = useState(initialTodo?.content || '')
-  const [dueDate, setDueDate] = useState(initialTodo?.dueDate || '')
+  const [description, setDescription] = useState(initialTodo?.description || '')
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>(initialTodo?.priority || 'medium')
+  const [status, setStatus] = useState<'todo' | 'in-progress' | 'review' | 'done'>(initialTodo?.status || 'todo')
+  const [tags, setTags] = useState<string[]>(initialTodo?.tags || [])
+  const [dueDate, setDueDate] = useState<string | null>(initialTodo?.dueDate || null)
   const [assignedTo, setAssignedTo] = useState(initialTodo?.assignedTo || '')
   const [documentTitle, setDocumentTitle] = useState('Untitled Document')
   const [personalTodos, setPersonalTodos] = useState<TodoItemAttributes[]>([])
@@ -95,6 +101,10 @@ export function TodoEditor({
       projectId: projectId || null,
       createdAt: initialTodo?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      description,
+      priority,
+      status,
+      tags,
     }
 
     if (initialTodo) {
@@ -107,101 +117,104 @@ export function TodoEditor({
     setContent('')
     setDueDate('')
     setAssignedTo('')
+    setDescription('')
+    setPriority('medium')
+    setStatus('todo')
+    setTags([])
   }
   
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    handleSave()
+  }
+
+  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const tagList = e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
+    setTags(tagList)
+  }
+
   return (
-    <div className="todo-editor space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <Label htmlFor="document-title">Note Title</Label>
-          <Input
-            id="document-title"
-            value={documentTitle}
-            onChange={(e) => setDocumentTitle(e.target.value)}
-            className="w-full md:w-[400px]"
-          />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="content">Task Title</Label>
+        <Input
+          id="content"
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          placeholder="What needs to be done?"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="description">Description</Label>
+        <Textarea
+          id="description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Add more details about this task..."
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="priority">Priority</Label>
+          <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="flex justify-end gap-2">
-          {onCancel && (
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-          )}
-          <Button onClick={handleSave}>
-            {initialTodo ? 'Update Todo' : 'Add Todo'}
-          </Button>
+
+        <div className="space-y-2">
+          <Label htmlFor="status">Status</Label>
+          <Select value={status} onValueChange={(value: any) => setStatus(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todo">Todo</SelectItem>
+              <SelectItem value="in-progress">In Progress</SelectItem>
+              <SelectItem value="review">Review</SelectItem>
+              <SelectItem value="done">Done</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Editor Column */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Document</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TodoEnabledEditor
-                initialContent={content}
-                onChange={setContent}
-                projectId={projectId}
-                onEditorReady={handleEditorReady}
-              />
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* Task Views Column */}
-        <div>
-          <Card>
-            <CardHeader className="pb-3 flex items-center justify-between">
-              <CardTitle>Tasks</CardTitle>
-              {isLoading && <span className="text-xs text-muted-foreground">Loading...</span>}
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="personal">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="personal">My Tasks</TabsTrigger>
-                  <TabsTrigger value="project">Project Tasks</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="personal" className="space-y-4 mt-4">
-                  {personalTodos.length === 0 ? (
-                    <p className="text-muted-foreground">No tasks assigned to you</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {personalTodos.map((todo) => (
-                        <TaskItem
-                          key={todo.id}
-                          todo={todo}
-                          onToggleComplete={toggleTodoCompletion}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-                
-                <TabsContent value="project" className="space-y-4 mt-4">
-                  {projectTodos.length === 0 ? (
-                    <p className="text-muted-foreground">No tasks in this project</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {projectTodos.map((todo) => (
-                        <TaskItem
-                          key={todo.id}
-                          todo={todo}
-                          onToggleComplete={toggleTodoCompletion}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="tags">Tags (comma-separated)</Label>
+        <Input
+          id="tags"
+          value={tags.join(', ')}
+          onChange={handleTagsChange}
+          placeholder="feature, bug, design"
+        />
       </div>
-    </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="dueDate">Due Date</Label>
+        <Input
+          type="date"
+          id="dueDate"
+          value={dueDate || ''}
+          onChange={(e) => setDueDate(e.target.value || null)}
+        />
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          Cancel
+        </Button>
+        <Button type="submit">Save Task</Button>
+      </div>
+    </form>
   )
 }
 

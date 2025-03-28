@@ -1,135 +1,165 @@
-import React from 'react'
-import { Editor, useEditor, EditorContent } from '@tiptap/react'
-import { StarterKit } from '@tiptap/starter-kit'
-import { Extension } from '@tiptap/core'
-import Document from '@tiptap/extension-document'
-import Paragraph from '@tiptap/extension-paragraph'
-import Text from '@tiptap/extension-text'
-import Bold from '@tiptap/extension-bold'
-import Italic from '@tiptap/extension-italic'
-import Heading from '@tiptap/extension-heading'
-import { TodoToolbar } from './todo-toolbar'
-import { TodoExtension } from '../lib/todo-extensions'
+import React, { useEffect, useState } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import { TodoExtension, TodoOptions } from '../lib/todo-extensions';
+import { useAuth } from '../../../App';
+import { getUserProjects } from '../../../lib/project-service';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../components/ui/select';
+import { Label } from '../../../components/ui/label';
+import { cn } from '../../../lib/utils';
 
-interface TodoEnabledEditorProps {
-  initialContent?: string
-  onChange?: (html: string) => void
-  className?: string
-  placeholder?: string
-  editable?: boolean
-  maxLength?: number
-  showToolbar?: boolean
-  projectId?: string
-  documentId?: string
-  currentUser?: string
-  onEditorReady?: (editor: Editor) => void
-  onTodoUpdate?: (attrs: any) => void
-  onTodoAttachment?: (data: any) => void
+interface Project {
+  id: string;
+  name: string;
 }
 
-export const TodoEnabledEditor = React.forwardRef<HTMLDivElement, TodoEnabledEditorProps>(
-  ({
-    initialContent = '',
-    onChange,
-    className,
-    placeholder = 'Write something...',
-    editable = true,
-    maxLength = 10000,
-    showToolbar = true,
-    projectId,
-    documentId,
-    currentUser,
-    onEditorReady,
-    onTodoUpdate,
-    onTodoAttachment,
-    ...props
-  }, ref) => {
-    const editor = useEditor({
-      extensions: [
-        Document.configure({
-          content: 'block+',
-        }),
-        Paragraph.configure({
-          HTMLAttributes: {
-            class: 'mb-2',
-          },
-        }),
-        Text,
-        Bold,
-        Italic,
-        Heading.configure({
-          levels: [1, 2, 3],
-        }),
-        StarterKit.configure({
-          document: false,
-          paragraph: false,
-          text: false,
-          bold: false,
-          italic: false,
-          heading: false,
-        }) as Extension,
-        TodoExtension.configure({
-          HTMLAttributes: {
-            class: 'shadcn-todo-item',
-            version: '2.3',
-          },
-          onToggle: (id, completed) => {
-            if (onTodoUpdate) {
-              onTodoUpdate({ id, completed });
-            }
-          },
-          onUpdate: (attrs) => {
-            if (onTodoUpdate) {
-              onTodoUpdate(attrs);
-            }
-          }
-        }),
-      ],
-      content: initialContent,
-      editable,
-      onUpdate: ({ editor }) => {
-        try {
-          const html = editor.getHTML();
-          onChange?.(html);
-        } catch (error) {
-          console.error('Error getting HTML:', error);
+interface TodoEnabledEditorProps {
+  content: string;
+  onChange: (content: string) => void;
+  className?: string;
+}
+
+export function TodoEnabledEditor({ content, onChange, className }: TodoEnabledEditorProps) {
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('');
+
+  useEffect(() => {
+    async function fetchProjects() {
+      if (!user) return;
+      const { projects: userProjects } = await getUserProjects(user.id);
+      setProjects(userProjects);
+    }
+    fetchProjects();
+  }, [user]);
+
+  const editor = useEditor({
+    extensions: [
+      StarterKit,
+      TaskList,
+      TaskItem,
+      TodoExtension.configure({
+        HTMLAttributes: {
+          class: 'todo-item',
+        },
+        onToggle: (id: string, completed: boolean) => {
+          // Handle todo toggle
+          console.log('Todo toggled:', id, completed);
+        },
+        onUpdate: (attrs) => {
+          // Handle todo update
+          console.log('Todo updated:', attrs);
         }
+      }),
+    ],
+    content,
+    editorProps: {
+      attributes: {
+        class: cn(
+          'prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none',
+          className
+        ),
       },
-      editorProps: {
-        attributes: {
-          class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-xl dark:prose-invert focus:outline-none min-h-[200px]',
-        },
-        handleDOMEvents: {
-          keydown: (view, event) => {
-            // Handle Enter key to create new todo
-            if (event.key === 'Enter' && !event.shiftKey) {
-              const { state } = view;
-              const { selection } = state;
-              const node = selection.$head.node();
-              
-              if (node.type.name === 'todo' && editor) {
-                event.preventDefault();
-                editor.commands.addTodo();
-                return true;
-              }
-            }
-            return false;
-          },
-        },
+      handleKeyDown: (view, event) => {
+        // Handle Enter key to create new todos
+        if (event.key === 'Enter' && !event.shiftKey) {
+          const { state } = view;
+          const { selection } = state;
+          const { $from } = selection;
+          
+          // Check if we're in a todo list
+          const node = $from.node();
+          if (node.type.name === 'todo') {
+            // Create a new todo item
+            view.dispatch(
+              view.state.tr.split(selection.$from.pos).scrollIntoView()
+            );
+            return true;
+          }
+        }
+        return false;
       },
-    });
+    },
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+  });
 
-    React.useEffect(() => {
-      if (editor && onEditorReady) {
-        onEditorReady(editor);
-      }
-    }, [editor, onEditorReady]);
-
-    return (
-      <div className={className} ref={ref}>
-        {showToolbar && editor && <TodoToolbar editor={editor} />}
-        <EditorContent editor={editor} />
-      </div>
-    );
+  if (!editor) {
+    return null;
   }
-); 
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center space-x-4">
+        <div className="w-64">
+          <Label htmlFor="project">Project</Label>
+          <Select
+            value={selectedProject}
+            onValueChange={setSelectedProject}
+          >
+            <SelectTrigger id="project">
+              <SelectValue placeholder="Select a project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">No Project</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <style>{`
+        .todo-item {
+          display: flex;
+          align-items: flex-start;
+          margin: 0.5em 0;
+          padding: 0.5em;
+          border-radius: 0.25em;
+          background-color: var(--background);
+          border: 1px solid var(--border);
+        }
+
+        .todo-item.completed {
+          background-color: var(--muted);
+          text-decoration: line-through;
+          color: var(--muted-foreground);
+        }
+
+        .todo-item input[type="checkbox"] {
+          margin-right: 0.5em;
+          margin-top: 0.25em;
+        }
+
+        .todo-item .todo-content {
+          flex: 1;
+          min-height: 1.5em;
+        }
+
+        .ProseMirror {
+          min-height: 200px;
+          padding: 1em;
+          border: 1px solid var(--border);
+          border-radius: 0.5em;
+        }
+
+        .ProseMirror:focus {
+          outline: none;
+          border-color: var(--ring);
+        }
+
+        .ProseMirror p {
+          margin: 0.5em 0;
+        }
+      `}</style>
+
+      <EditorContent editor={editor} />
+    </div>
+  );
+} 

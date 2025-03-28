@@ -1,10 +1,26 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { supabase, Project } from '../../../lib/supabase';
 import { TodoItemAttributes, getUserTodos, createTodo as apiCreateTodo, updateTodo as apiUpdateTodo, deleteTodo as apiDeleteTodo, toggleTodoCompletion, assignTodo } from '../lib/todo-service';
 import { handleSupabaseError, AppError, ErrorType } from '../../../lib/error-handling';
 import { useUser } from '../../../lib/user-context';
 import { TodoItem } from '../../../types/todo';
 import { getUserProjects } from '../../../lib/project-service';
+
+export interface TodoItemAttributes {
+  id: string;
+  content: string;
+  description?: string;
+  completed: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  status?: 'todo' | 'in-progress' | 'review' | 'done';
+  tags?: string[];
+  projectId?: string;
+  assignedTo?: string;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  commentsCount?: number;
+}
 
 type TodoContextType = {
   todos: TodoItemAttributes[];
@@ -18,12 +34,12 @@ type TodoContextType = {
   setFilter: (filter: 'all' | 'completed' | 'incomplete' | 'overdue') => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  createTodo: (todo: Omit<TodoItemAttributes, 'id' | 'createdAt'>, userId: string) => Promise<TodoItemAttributes | null>;
+  createTodo: (todo: Omit<TodoItemAttributes, 'id' | 'createdAt' | 'updatedAt'>, userId: string) => Promise<TodoItemAttributes | null>;
   updateTodoAttributes: (id: string, data: Partial<TodoItemAttributes>) => Promise<TodoItemAttributes | null>;
   deleteTodoById: (id: string) => Promise<boolean>;
   refreshTodos: () => Promise<void>;
   projects?: Project[];
-  addTodo: (todo: TodoItem) => Promise<void>;
+  addTodo: (todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateTodo: (todo: TodoItem) => Promise<void>;
   deleteTodo: (id: string) => Promise<void>;
 };
@@ -35,13 +51,17 @@ export function mapDbTodoToFrontend(dbTodo: any): TodoItemAttributes {
   return {
     id: dbTodo.id,
     content: dbTodo.content,
+    description: dbTodo.description || "",
     completed: dbTodo.completed || false,
+    status: dbTodo.status || 'todo',
+    priority: dbTodo.priority || 'medium',
+    tags: dbTodo.tags || [],
     projectId: dbTodo.project_id,
     assignedTo: dbTodo.assigned_to,
     dueDate: dbTodo.due_date,
-    createdBy: dbTodo.created_by,
     createdAt: dbTodo.created_at,
-    updatedAt: dbTodo.updated_at
+    updatedAt: dbTodo.updated_at,
+    commentsCount: dbTodo.comments_count
   };
 }
 
@@ -112,7 +132,7 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   // Create a new todo
-  const createTodo = async (todoData: Omit<TodoItemAttributes, 'id' | 'createdAt'>, userId: string): Promise<TodoItemAttributes | null> => {
+  const createTodo = async (todoData: Omit<TodoItemAttributes, 'id' | 'createdAt' | 'updatedAt'>, userId: string): Promise<TodoItemAttributes | null> => {
     if (!user?.id) return null;
     
     try {
@@ -215,17 +235,20 @@ export function TodoProvider({ children }: { children: ReactNode }) {
   };
 
   // New todo CRUD operations
-  const addTodo = async (todo: TodoItem) => {
+  const addTodo = async (todo: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user?.id) return;
     
     try {
       const todoData = {
         content: todo.content,
-        completed: todo.completed || false,
+        description: todo.description,
+        completed: todo.completed,
+        status: todo.status,
+        priority: todo.priority,
+        tags: todo.tags,
         projectId: todo.projectId,
         assignedTo: todo.assignedTo,
-        dueDate: todo.dueDate,
-        createdBy: user.id
+        dueDate: todo.dueDate
       };
       
       await createTodo(todoData, user.id);
@@ -240,7 +263,11 @@ export function TodoProvider({ children }: { children: ReactNode }) {
     try {
       const todoData = {
         content: todo.content,
+        description: todo.description,
         completed: todo.completed,
+        status: todo.status,
+        priority: todo.priority,
+        tags: todo.tags,
         projectId: todo.projectId,
         assignedTo: todo.assignedTo,
         dueDate: todo.dueDate

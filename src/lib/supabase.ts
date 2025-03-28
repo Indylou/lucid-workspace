@@ -52,7 +52,11 @@ export interface Project {
 export interface Todo {
   id: string;
   content: string;
+  description?: string;
   completed: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  status?: 'todo' | 'in-progress' | 'review' | 'done';
+  tags?: string[];
   project_id?: string;
   assigned_to?: string;
   created_by: string;

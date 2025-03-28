@@ -1,707 +1,187 @@
-import React, { useState, useEffect } from 'react'
-import { Button } from '../ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
-import { 
-  BarChart as BarChartIcon, 
-  PieChart, 
-  LineChart, 
-  Users, 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  FileText,
-  ArrowUpRight,
-  ArrowDownRight,
-  Loader2,
-  User
-} from 'lucide-react'
-import { useAuth } from '../../App'
-import { toast } from '../ui/use-toast'
-import { TodoItemAttributes, getUserTodos } from '../../features/todos/lib'
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isThisWeek, differenceInDays } from 'date-fns'
-import { supabase } from '../../lib/supabase'
-
-// Project types
-interface Project {
-  id: string
-  name: string
-  taskCount: number
-  completedTaskCount: number
-  collaborators: number
-  activityLevel: 'high' | 'medium' | 'low'
-  lastUpdated: Date
-}
-
-interface ProjectTask {
-  id: string
-  completed: boolean
-  created_at: string
-  updated_at: string
-  project_id: string
-}
-
-interface UserActivity {
-  date: Date
-  completedTasks: number
-  addedTasks: number
-}
+import React, { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Progress } from '../../components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { BarChart, Calendar, CheckCircle, Clock } from 'lucide-react';
+import { useAuth } from '../../lib/auth';
+import { TodoItem, getUserTodos } from '../../lib/todo-service';
+import { Project, getUserProjects, getProjectMetrics } from '../../lib/project-service';
+import { cn } from '../../lib/utils';
 
 interface CompletionStats {
-  completed: number
-  pending: number
-  overdue: number
-  total: number
-  completionRate: number
+  total: number;
+  completed: number;
+  overdue: number;
+  rate: number;
+}
+
+interface ProjectMetrics {
+  id: string;
+  name: string;
+  completion_rate: number;
+  tasks_total: number;
+  tasks_completed: number;
+  recent_activity: number;
 }
 
 export function AnalyticsModule() {
-  const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState('personal')
-  const [isLoading, setIsLoading] = useState(true)
-  const [userTasks, setUserTasks] = useState<TodoItemAttributes[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
-  const [userActivity, setUserActivity] = useState<UserActivity[]>([])
-  const [completionStats, setCompletionStats] = useState<CompletionStats>({
-    completed: 0,
-    pending: 0,
-    overdue: 0,
+  const { user } = useAuth();
+  const [stats, setStats] = useState<CompletionStats>({
     total: 0,
-    completionRate: 0
-  })
+    completed: 0,
+    overdue: 0,
+    rate: 0
+  });
+  const [projectMetrics, setProjectMetrics] = useState<ProjectMetrics[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch data for analytics
   useEffect(() => {
-    const fetchAnalyticsData = async () => {
-      setIsLoading(true);
-      
+    async function fetchData() {
+      if (!user) return;
+
       try {
-        if (!user) {
-          throw new Error('User not authenticated')
-        }
+        // Fetch todos
+        const { todos } = await getUserTodos(user.id);
+        const now = new Date();
         
-        // Use real data from Supabase instead of mock data
-        
-        // Fetch user tasks
-        const { todos } = await getUserTodos(user.id)
-        setUserTasks(todos)
-        
-        // Calculate completion stats
-        const completed = todos.filter(t => t.completed).length
-        const pending = todos.filter(t => !t.completed && (!t.dueDate || new Date(t.dueDate) >= new Date())).length
-        const overdue = todos.filter(t => !t.completed && t.dueDate && new Date(t.dueDate) < new Date()).length
-        const total = todos.length
-        
-        setCompletionStats({
-          completed,
-          pending,
-          overdue,
-          total,
-          completionRate: total > 0 ? (completed / total) * 100 : 0
-        })
-        
-        // Fetch projects from Supabase
-        const { data: projectsData, error: projectsError } = await supabase
-          .from('projects')
-          .select('*')
-        
-        if (projectsError) {
-          console.error('Error fetching projects:', projectsError)
-          throw new Error('Failed to fetch projects')
-        }
-        
-        // Transform project data to include task counts
-        const projectsWithTaskCounts = await Promise.all(
-          (projectsData || []).map(async (project: any) => {
-            const { data: projectTasks, error } = await supabase
-              .from('todos')
-              .select('*')
-              .eq('project_id', project.id)
-            
-            if (error) {
-              console.error(`Error fetching tasks for project ${project.id}:`, error)
-              return null
-            }
-            
-            const tasks = projectTasks as ProjectTask[]
-            const taskCount = tasks?.length || 0
-            const completedTaskCount = tasks?.filter((t: ProjectTask) => t.completed).length || 0
-            
-            // Get collaborators for this project
-            const { data: collaborators, error: collabError } = await supabase
-              .from('project_members')
-              .select('*')
-              .eq('project_id', project.id)
-            
-            if (collabError) {
-              console.error(`Error fetching collaborators for project ${project.id}:`, collabError)
-            }
-            
-            // Determine activity level based on recent tasks
-            const recentTasks = tasks?.filter((t: ProjectTask) => {
-              const updateDate = new Date(t.updated_at || t.created_at)
-              const daysDiff = (new Date().getTime() - updateDate.getTime()) / (1000 * 3600 * 24)
-              return daysDiff <= 7 // Tasks updated in the last 7 days
-            })
-            
-            let activityLevel: 'high' | 'medium' | 'low' = 'low'
-            if (recentTasks && recentTasks.length > 0) {
-              activityLevel = recentTasks.length > 5 ? 'high' : recentTasks.length > 2 ? 'medium' : 'low'
-            }
-            
-            // Get the last updated date
-            const lastUpdated = tasks && tasks.length > 0
-              ? tasks.reduce((latest: Date, task: ProjectTask) => {
-                  const taskDate = new Date(task.updated_at || task.created_at)
-                  return taskDate > latest ? taskDate : latest
-                }, new Date(0))
-              : new Date()
-            
-            return {
-              id: project.id,
-              name: project.name,
-              taskCount,
-              completedTaskCount,
-              collaborators: collaborators?.length || 0,
-              activityLevel,
-              lastUpdated
-            } as Project
-          })
-        )
-        
-        // Filter out null projects (from errors)
-        setProjects(projectsWithTaskCounts.filter((p: Project | null) => p !== null) as Project[])
-        
-        // Generate activity data for the past week
-        const days = eachDayOfInterval({
-          start: startOfWeek(new Date()),
-          end: endOfWeek(new Date())
-        })
-        
-        // Get activity data for each day in the week
-        const activityData = await Promise.all(
-          days.map(async (date: Date) => {
-            const dayStart = new Date(date)
-            dayStart.setHours(0, 0, 0, 0)
-            
-            const dayEnd = new Date(date)
-            dayEnd.setHours(23, 59, 59, 999)
-            
-            // Get completed tasks for this day
-            const { data: completedTasks, error: completedError } = await supabase
-              .from('todos')
-              .select('*')
-              .eq('completed', true)
-              .gte('updated_at', dayStart.toISOString())
-              .lte('updated_at', dayEnd.toISOString())
-              .eq('assigned_to', user.id)
-            
-            if (completedError) {
-              console.error(`Error fetching completed tasks for ${date.toDateString()}:`, completedError)
-            }
-            
-            // Get added tasks for this day
-            const { data: addedTasks, error: addedError } = await supabase
-              .from('todos')
-              .select('*')
-              .gte('created_at', dayStart.toISOString())
-              .lte('created_at', dayEnd.toISOString())
-              .eq('assigned_to', user.id)
-            
-            if (addedError) {
-              console.error(`Error fetching added tasks for ${date.toDateString()}:`, addedError)
-            }
-            
-            return {
-              date,
-              completedTasks: completedTasks?.length || 0,
-              addedTasks: addedTasks?.length || 0
-            }
-          })
-        )
-        
-        setUserActivity(activityData)
-        
+        const completionStats: CompletionStats = {
+          total: 0,
+          completed: 0,
+          overdue: 0,
+          rate: 0
+        };
+
+        todos.forEach((todo: TodoItem) => {
+          completionStats.total++;
+          if (todo.completed) completionStats.completed++;
+          if (todo.due_date && new Date(todo.due_date) < now && !todo.completed) {
+            completionStats.overdue++;
+          }
+        });
+
+        completionStats.rate = completionStats.total > 0 
+          ? (completionStats.completed / completionStats.total) * 100 
+          : 0;
+
+        setStats(completionStats);
+
+        // Fetch projects and their metrics
+        const { projects } = await getUserProjects(user.id);
+        const metricsPromises = projects.map(async (project: Project) => {
+          const { metrics } = await getProjectMetrics(project.id);
+          return {
+            id: project.id,
+            name: project.name,
+            ...metrics
+          };
+        });
+
+        const projectMetricsData = await Promise.all(metricsPromises);
+        setProjectMetrics(projectMetricsData);
       } catch (error) {
-        console.error('Error fetching analytics data:', error)
-        toast({
-          title: 'Error loading analytics',
-          description: error instanceof Error ? error.message : 'An unexpected error occurred',
-        })
+        console.error('Error fetching analytics data:', error);
       } finally {
-        setIsLoading(false)
+        setLoading(false);
       }
     }
-    
-    fetchAnalyticsData()
-  }, [user])
 
-  // Render loading state
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[500px]">
-        <Loader2 className="animate-spin h-8 w-8 text-primary" />
-      </div>
-    )
+    fetchData();
+  }, [user]);
+
+  if (loading) {
+    return <div>Loading analytics...</div>;
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Analytics</h1>
-        <p className="text-muted-foreground">Track your productivity and project progress</p>
-      </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="personal" className="flex items-center">
-            <User className="h-4 w-4 mr-2" />
-            Personal
-          </TabsTrigger>
-          <TabsTrigger value="projects" className="flex items-center">
-            <Users className="h-4 w-4 mr-2" />
-            Projects
-          </TabsTrigger>
-        </TabsList>
-        
-        {/* Personal Analytics */}
-        <TabsContent value="personal" className="space-y-6">
-          {/* Top Cards */}
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-            {/* Task Completion Rate */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
-                  Completion Rate
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completionStats.completionRate.toFixed(0)}%</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>5% increase from last week</span>
-                </div>
-                <div className="mt-4 h-2 w-full bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-primary" 
-                    style={{ width: `${completionStats.completionRate}%` }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Tasks Completed */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
-                  Tasks Completed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completionStats.completed}</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>3 more than last week</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Pending Tasks */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Clock className="mr-2 h-4 w-4 text-amber-500" />
-                  Pending Tasks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completionStats.pending}</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowDownRight className="mr-1 h-3 w-3 text-amber-500" />
-                  <span>2 less than last week</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Overdue Tasks */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Calendar className="mr-2 h-4 w-4 text-red-500" />
-                  Overdue Tasks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{completionStats.overdue}</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowDownRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>1 less than last week</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Analytics Overview</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="tasks">
+          <TabsList>
+            <TabsTrigger value="tasks">Tasks</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+          </TabsList>
           
-          {/* Weekly Activity Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Weekly Activity</CardTitle>
-              <CardDescription>Your task completion and creation over the past week</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px]">
-                <div className="flex flex-col h-full">
-                  {/* Mock Bar Chart - In a real app, use a chart library like recharts */}
-                  <div className="flex-1 flex items-end justify-between mt-6">
-                    {userActivity.map((day, i) => (
-                      <div key={i} className="flex flex-col items-center justify-end space-y-2 w-1/7">
-                        <div className="flex flex-col items-center space-y-1">
-                          <div 
-                            className="w-12 bg-primary/80 rounded-t"
-                            style={{ height: `${day.completedTasks * 30}px` }}
-                          ></div>
-                          <div 
-                            className="w-12 bg-blue-300 rounded-t"
-                            style={{ height: `${day.addedTasks * 30}px` }}
-                          ></div>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(day.date, 'EEE')}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex items-center justify-center mt-6 space-x-4">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-primary rounded mr-2"></div>
-                      <span className="text-sm">Completed</span>
-                    </div>
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-300 rounded mr-2"></div>
-                      <span className="text-sm">Created</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <TabsContent value="tasks" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.rate.toFixed(1)}%</div>
+                  <Progress value={stats.rate} className="mt-2" />
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Completed Tasks</CardTitle>
+                  <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.completed}</div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Overdue Tasks</CardTitle>
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats.overdue}</div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
           
-          {/* Task Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Task Status Distribution */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Task Status</CardTitle>
-                <CardDescription>Distribution of your tasks by status</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[200px] flex items-center justify-center">
-                  {/* Mock Pie Chart - In a real app, use a chart library */}
-                  <div className="relative h-40 w-40">
-                    <div className="absolute inset-0 rounded-full border-8 border-primary" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0% 100%)' }}></div>
-                    <div className="absolute inset-0 rounded-full border-8 border-amber-400" style={{ clipPath: 'polygon(0 0, 50% 0, 50% 100%, 0% 100%)' }}></div>
-                    <div className="absolute inset-0 rounded-full border-8 border-red-400" style={{ clipPath: 'polygon(0 0, 20% 0, 20% 20%, 0% 20%)' }}></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-lg font-bold">{completionStats.total}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex flex-col space-y-4 mt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-primary rounded mr-2"></div>
-                      <span className="text-sm">Completed</span>
-                    </div>
-                    <span className="text-sm font-medium">{completionStats.completed} tasks</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-amber-400 rounded mr-2"></div>
-                      <span className="text-sm">Pending</span>
-                    </div>
-                    <span className="text-sm font-medium">{completionStats.pending} tasks</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-red-400 rounded mr-2"></div>
-                      <span className="text-sm">Overdue</span>
-                    </div>
-                    <span className="text-sm font-medium">{completionStats.overdue} tasks</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Task Tags/Categories */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Distribution</CardTitle>
-                <CardDescription>Your tasks by project</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* In a real app, you would use data from API */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-blue-500 rounded mr-2"></div>
-                      <span className="text-sm">Website Redesign</span>
-                    </div>
-                    <span className="text-sm font-medium">8 tasks</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500" style={{ width: '32%' }}></div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-purple-500 rounded mr-2"></div>
-                      <span className="text-sm">Marketing Campaign</span>
-                    </div>
-                    <span className="text-sm font-medium">6 tasks</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500" style={{ width: '24%' }}></div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-green-500 rounded mr-2"></div>
-                      <span className="text-sm">Q4 Planning</span>
-                    </div>
-                    <span className="text-sm font-medium">5 tasks</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-green-500" style={{ width: '20%' }}></div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 bg-gray-500 rounded mr-2"></div>
-                      <span className="text-sm">Personal Tasks</span>
-                    </div>
-                    <span className="text-sm font-medium">6 tasks</span>
-                  </div>
-                  <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-                    <div className="h-full bg-gray-500" style={{ width: '24%' }}></div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        {/* Project Analytics */}
-        <TabsContent value="projects" className="space-y-6">
-          {/* Top Cards */}
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-            {/* Total Projects */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <FileText className="mr-2 h-4 w-4 text-primary" />
-                  Total Projects
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{projects.length}</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>1 new this month</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Total Tasks */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-primary" />
-                  Total Tasks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {projects.reduce((sum, project) => sum + project.taskCount, 0)}
-                </div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>8 more than last month</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Tasks Completed */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
-                  Completed Tasks
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {projects.reduce((sum, project) => sum + project.completedTaskCount, 0)}
-                </div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>12 more than last month</span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Total Collaborators */}
-            <Card>
-              <CardHeader className="py-4">
-                <CardTitle className="text-sm font-medium flex items-center">
-                  <Users className="mr-2 h-4 w-4 text-primary" />
-                  Team Members
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">8</div>
-                <div className="flex items-center text-xs text-muted-foreground">
-                  <ArrowUpRight className="mr-1 h-3 w-3 text-green-500" />
-                  <span>2 new this month</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          
-          {/* Project Performance Chart */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Project Completion Rates</CardTitle>
-              <CardDescription>Task completion percentage by project</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {projects.map(project => {
-                  const completionRate = project.taskCount > 0 
-                    ? (project.completedTaskCount / project.taskCount) * 100 
-                    : 0
-                  
-                  return (
-                    <div key={project.id} className="space-y-2">
+          <TabsContent value="projects" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {projectMetrics.map(project => (
+                <Card key={project.id}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">{project.name}</CardTitle>
+                    <BarChart className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{project.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {project.completedTaskCount} / {project.taskCount} tasks
-                        </div>
+                        <span className="text-sm text-muted-foreground">Completion</span>
+                        <span className="text-sm font-medium">{project.completion_rate.toFixed(1)}%</span>
                       </div>
-                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${
-                            completionRate > 75 ? 'bg-green-500' : 
-                            completionRate > 50 ? 'bg-blue-500' : 
-                            completionRate > 25 ? 'bg-amber-500' : 'bg-red-500'
-                          }`}
-                          style={{ width: `${completionRate}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-xs text-muted-foreground">
+                      <Progress value={project.completion_rate} />
+                      <div className="grid grid-cols-2 gap-2 pt-2">
                         <div>
-                          Last updated: {format(project.lastUpdated, 'MMM d, yyyy')}
+                          <p className="text-sm text-muted-foreground">Tasks</p>
+                          <p className="text-sm font-medium">{project.tasks_completed}/{project.tasks_total}</p>
                         </div>
                         <div>
-                          {completionRate.toFixed(0)}% complete
+                          <p className="text-sm text-muted-foreground">Recent Activity</p>
+                          <p className="text-sm font-medium">{project.recent_activity} updates</p>
                         </div>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Project Activity and Team Distribution */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Project Activity */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Activity</CardTitle>
-                <CardDescription>Recent activity by project</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {projects
-                    .sort((a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime())
-                    .map(project => (
-                      <div key={project.id} className="flex items-start space-x-4">
-                        <div className={`mt-0.5 h-9 w-9 rounded-full flex items-center justify-center ${
-                          project.activityLevel === 'high' ? 'bg-green-100 text-green-700' :
-                          project.activityLevel === 'medium' ? 'bg-blue-100 text-blue-700' :
-                          'bg-amber-100 text-amber-700'
-                        }`}>
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="font-medium">{project.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            Last updated {format(project.lastUpdated, 'MMM d, yyyy')}
-                          </div>
-                          <div className="text-sm">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              project.activityLevel === 'high' ? 'bg-green-100 text-green-800' :
-                              project.activityLevel === 'medium' ? 'bg-blue-100 text-blue-800' :
-                              'bg-amber-100 text-amber-800'
-                            }`}>
-                              {project.activityLevel === 'high' ? 'High activity' :
-                               project.activityLevel === 'medium' ? 'Medium activity' :
-                               'Low activity'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Team Distribution */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Distribution</CardTitle>
-                <CardDescription>Collaborators by project</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] flex items-center justify-center">
-                  {/* Mock Pie Chart - In a real app, use a chart library */}
-                  <div className="relative h-48 w-48">
-                    <svg viewBox="0 0 100 100" className="h-full w-full">
-                      {/* Project 1 */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#3b82f6" strokeWidth="20" strokeDasharray="60 40" strokeDashoffset="0"></circle>
-                      {/* Project 2 */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#8b5cf6" strokeWidth="20" strokeDasharray="45 55" strokeDashoffset="-60"></circle>
-                      {/* Project 3 */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" strokeWidth="20" strokeDasharray="30 70" strokeDashoffset="-105"></circle>
-                      {/* Project 4 */}
-                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" strokeWidth="20" strokeDasharray="15 85" strokeDashoffset="-135"></circle>
-                    </svg>
-                  </div>
-                </div>
-                
-                <div className="space-y-3 mt-4">
-                  {projects.map((project, index) => {
-                    const colors = ['#3b82f6', '#8b5cf6', '#22c55e', '#ef4444']
-                    return (
-                      <div key={project.id} className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-3 h-3 rounded mr-2" style={{ backgroundColor: colors[index % colors.length] }}></div>
-                          <span className="text-sm">{project.name}</span>
-                        </div>
-                        <span className="text-sm font-medium">{project.collaborators} members</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
 } 

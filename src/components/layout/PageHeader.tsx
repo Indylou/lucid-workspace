@@ -13,17 +13,19 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">{title}</h2>
-        <p className="text-muted-foreground mt-1">{description}</p>
+    <div className="border-b pb-4 mb-4">
+      <div className="flex items-center justify-between px-4 py-2">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        {action && (
+          <Button onClick={action.onClick} size="default" className="gap-2">
+            <PlusCircle className="h-4 w-4" />
+            {action.label}
+          </Button>
+        )}
       </div>
-      {action && (
-        <Button onClick={action.onClick} size="lg" className="gap-2">
-          <PlusCircle className="h-4 w-4" />
-          {action.label}
-        </Button>
-      )}
     </div>
   );
 } 
