@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '../components/ui/alert'
 import { loginUser } from '../lib/auth-service'
 import { useNavigate, Link } from 'react-router-dom'
 import { useUser } from '../lib/user-context'
+import AuthLayout from '../components/layout/AuthLayout'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -52,8 +53,8 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background">
-      <Card className="w-[400px]">
+    <AuthLayout>
+      <Card>
         <CardHeader>
           <CardTitle>Login</CardTitle>
           <CardDescription>
@@ -103,15 +104,7 @@ export function LoginPage() {
             </div>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-primary hover:underline">
-              Register
-            </Link>
-          </p>
-        </CardFooter>
       </Card>
-    </div>
+    </AuthLayout>
   )
 } 

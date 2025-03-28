@@ -1,0 +1,100 @@
+.container {
+  @apply h-full flex flex-col;
+}
+
+.header {
+  @apply border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60;
+}
+
+.headerContent {
+  @apply px-6 py-3 flex items-center justify-between;
+}
+
+.title {
+  @apply text-lg font-medium;
+}
+
+.mainContent {
+  @apply flex-1 px-4 py-3 min-h-0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  height: 100%;
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.filtersCard {
+  @apply h-auto md:h-full bg-muted/40;
+}
+
+.filtersList {
+  @apply space-y-3 px-2;
+}
+
+.filterButton {
+  @apply justify-start h-7 px-2 text-xs font-normal;
+}
+
+.filterIcon {
+  @apply mr-2 h-3 w-3;
+}
+
+.filterBadge {
+  @apply ml-auto text-[10px] font-normal px-1.5 py-0;
+}
+
+.select {
+  @apply h-7 text-xs font-normal bg-background;
+}
+
+.tasksCard {
+  @apply h-auto md:h-full;
+}
+
+.searchContainer {
+  @apply relative flex-1;
+}
+
+.searchIcon {
+  @apply absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground;
+}
+
+.searchInput {
+  @apply pl-7 h-7 text-xs;
+}
+
+.tasksList {
+  @apply h-full -mx-6;
+}
+
+.tasksGrid {
+  @apply space-y-1 px-6;
+}
+
+.emptyState {
+  @apply h-full flex flex-col items-center justify-center text-center;
+}
+
+.emptyIcon {
+  @apply h-8 w-8 text-muted-foreground mb-3 opacity-20;
+}
+
+.emptyText {
+  @apply text-xs font-medium;
+}
+
+.createButton {
+  @apply mt-3 h-7 text-xs;
+}
+
+.createIcon {
+  @apply mr-1.5 h-3 w-3;
+} 

@@ -22,7 +22,7 @@ import { TodoItemAttributes, getUserTodos } from '../../features/todos/lib'
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isThisWeek, differenceInDays } from 'date-fns'
 import { supabase } from '../../lib/supabase'
 
-// Mock project types
+// Project types
 interface Project {
   id: string
   name: string
@@ -31,6 +31,14 @@ interface Project {
   collaborators: number
   activityLevel: 'high' | 'medium' | 'low'
   lastUpdated: Date
+}
+
+interface ProjectTask {
+  id: string
+  completed: boolean
+  created_at: string
+  updated_at: string
+  project_id: string
 }
 
 interface UserActivity {
@@ -104,8 +112,7 @@ export function AnalyticsModule() {
         
         // Transform project data to include task counts
         const projectsWithTaskCounts = await Promise.all(
-          (projectsData || []).map(async (project) => {
-            // Fetch tasks for this project
+          (projectsData || []).map(async (project: any) => {
             const { data: projectTasks, error } = await supabase
               .from('todos')
               .select('*')
@@ -116,8 +123,9 @@ export function AnalyticsModule() {
               return null
             }
             
-            const taskCount = projectTasks?.length || 0
-            const completedTaskCount = projectTasks?.filter(t => t.completed).length || 0
+            const tasks = projectTasks as ProjectTask[]
+            const taskCount = tasks?.length || 0
+            const completedTaskCount = tasks?.filter((t: ProjectTask) => t.completed).length || 0
             
             // Get collaborators for this project
             const { data: collaborators, error: collabError } = await supabase
@@ -130,7 +138,7 @@ export function AnalyticsModule() {
             }
             
             // Determine activity level based on recent tasks
-            const recentTasks = projectTasks?.filter(t => {
+            const recentTasks = tasks?.filter((t: ProjectTask) => {
               const updateDate = new Date(t.updated_at || t.created_at)
               const daysDiff = (new Date().getTime() - updateDate.getTime()) / (1000 * 3600 * 24)
               return daysDiff <= 7 // Tasks updated in the last 7 days
@@ -142,8 +150,8 @@ export function AnalyticsModule() {
             }
             
             // Get the last updated date
-            const lastUpdated = projectTasks && projectTasks.length > 0
-              ? projectTasks.reduce((latest, task) => {
+            const lastUpdated = tasks && tasks.length > 0
+              ? tasks.reduce((latest: Date, task: ProjectTask) => {
                   const taskDate = new Date(task.updated_at || task.created_at)
                   return taskDate > latest ? taskDate : latest
                 }, new Date(0))
@@ -162,16 +170,17 @@ export function AnalyticsModule() {
         )
         
         // Filter out null projects (from errors)
-        setProjects(projectsWithTaskCounts.filter(p => p !== null) as Project[])
+        setProjects(projectsWithTaskCounts.filter((p: Project | null) => p !== null) as Project[])
         
         // Generate activity data for the past week
-        const start = startOfWeek(new Date())
-        const end = endOfWeek(new Date())
-        const days = eachDayOfInterval({ start, end })
+        const days = eachDayOfInterval({
+          start: startOfWeek(new Date()),
+          end: endOfWeek(new Date())
+        })
         
         // Get activity data for each day in the week
         const activityData = await Promise.all(
-          days.map(async (date) => {
+          days.map(async (date: Date) => {
             const dayStart = new Date(date)
             dayStart.setHours(0, 0, 0, 0)
             

@@ -13,6 +13,7 @@ import { useUser } from './lib/user-context';
 import { TodoProvider } from './features/todos/hooks';
 import TestSupabasePage from './pages/test-supabase';
 import './App.css';
+import { ThemeProvider } from './components/theme-provider';
 
 // Create auth context
 interface AuthContextType {
@@ -78,15 +79,17 @@ function App() {
   const location = useLocation();
 
   return (
-    <ToastProvider>
-      <UserProvider>
-        <AuthProvider>
-          <TodoProvider>
-            <AppRoutes location={location} />
-          </TodoProvider>
-        </AuthProvider>
-      </UserProvider>
-    </ToastProvider>
+    <ThemeProvider defaultTheme="system" storageKey="app-theme">
+      <ToastProvider>
+        <UserProvider>
+          <AuthProvider>
+            <TodoProvider>
+              <AppRoutes location={location} />
+            </TodoProvider>
+          </AuthProvider>
+        </UserProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }
 

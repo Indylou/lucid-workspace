@@ -35,6 +35,8 @@ import Code from '@tiptap/extension-code'
 import { Extension } from '@tiptap/core'
 import Underline from '@tiptap/extension-underline'
 import { TodoExtension } from '../../features/todos/lib/todo-extensions'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 
 interface EnhancedRichTextEditorProps {
   className?: string
@@ -99,6 +101,13 @@ export const EnhancedRichTextEditor = React.forwardRef<HTMLDivElement, EnhancedR
           codeBlock: false,
           blockquote: false,
         }) as Extension,
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+          HTMLAttributes: {
+            class: 'task-item',
+          },
+        }),
         ...(props.enableTodos ? [TodoExtension.configure({
           HTMLAttributes: {
             class: 'shadcn-todo-item',

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { registerUser } from '../lib/auth-service';
 import { useAuth } from '../App';
 import { toast } from '../components/ui/use-toast';
+import AuthLayout from '../components/layout/AuthLayout';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -54,8 +55,8 @@ export const RegisterPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
+    <AuthLayout>
+      <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
           <CardDescription>
@@ -103,28 +104,12 @@ export const RegisterPage: React.FC = () => {
                 {error}
               </div>
             )}
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={loading}
-            >
-              {loading ? 'Creating account...' : 'Register'}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
-            <div className="text-center text-sm">
-              Already have an account?{' '}
-              <Button
-                variant="link"
-                className="p-0 h-auto font-normal"
-                onClick={() => navigate('/login')}
-              >
-                Log in
-              </Button>
-            </div>
-          </CardFooter>
+          </CardContent>
         </form>
       </Card>
-    </div>
+    </AuthLayout>
   );
 }; 
