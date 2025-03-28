@@ -263,11 +263,10 @@ export function CalendarModule() {
     .slice(0, 5) // Limit to 5 events
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto py-6 px-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Calendar</h1>
-          <p className="text-muted-foreground">Manage your schedule and view upcoming tasks</p>
         </div>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
@@ -411,12 +410,12 @@ export function CalendarModule() {
               {/* Upcoming Events */}
               <Card>
                 <CardContent className="p-4">
-                  <h3 className="text-lg font-medium mb-4">Upcoming Events</h3>
+                  <h3 className="text-lg font-medium mb-4">Upcoming...</h3>
                   
                   {upcomingEvents.length === 0 ? (
                     <div className="py-8 text-center">
                       <CalendarIcon className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                      <p className="text-muted-foreground">No upcoming events</p>
+                      <p className="text-muted-foreground">nothing yet!</p>
                       <Button 
                         variant="outline" 
                         size="sm" 
@@ -427,7 +426,7 @@ export function CalendarModule() {
                         }}
                       >
                         <Plus className="h-4 w-4 mr-1" />
-                        Create Event
+                        add new
                       </Button>
                     </div>
                   ) : (

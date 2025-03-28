@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useParams, useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import { EnhancedHeader } from "./EnhancedHeader";
 import { 
   FileText, 
   Home, 
@@ -487,9 +486,7 @@ export function DashboardLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <EnhancedHeader />
-      
+    <div className="min-h-screen bg-background flex flex-col">      
       <div className="flex flex-1 overflow-hidden">
         {/* Collapsible Sidebar using our component */}
         <Sidebar

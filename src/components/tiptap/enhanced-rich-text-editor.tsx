@@ -264,17 +264,6 @@ export const EnhancedRichTextEditor = React.forwardRef<HTMLDivElement, EnhancedR
     function renderCard() {
       return (
         <Card className="border-none shadow-none bg-transparent h-full flex flex-col">
-          {!props.hideTitle && (
-            <CardHeader className="px-4 py-3 border-b flex-shrink-0">
-              <Input
-                placeholder="Document title"
-                value={title}
-                onChange={handleTitleChange}
-                className="border-none p-0 text-lg font-semibold focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-            </CardHeader>
-          )}
-          
           {props.enableTodos ? (
             <CardContent className="p-0 CardContent flex-grow min-h-[70vh]">
               <div className="glass-effect-editor h-full">
@@ -293,23 +282,21 @@ export const EnhancedRichTextEditor = React.forwardRef<HTMLDivElement, EnhancedR
           ) : (
             <>
               {showToolbar && <TiptapToolbar editor={editor} />}
-              <CardContent className="p-0 CardContent flex-grow min-h-[70vh]">
-                <div className="prose prose-sm sm:prose max-w-none dark:prose-invert prose-headings:font-semibold h-full flex flex-col">
-                  <TiptapEditor
-                    initialContent={value || initialContent}
-                    onChange={handleUpdate}
-                    onMount={(e) => {
-                      if (props.onEditorReady) {
-                        props.onEditorReady(e);
-                      }
-                    }}
-                    placeholder={placeholder}
-                    editable={editable}
-                    maxLength={props.showCharacterCount ? maxLength : undefined}
-                    className="border-none focus-within:ring-0 focus-within:ring-offset-0 EditorContent flex-grow"
-                  />
-                </div>
-              </CardContent>
+              <div className="prose prose-sm sm:prose max-w-none dark:prose-invert prose-headings:font-semibold h-full flex flex-col">
+                <TiptapEditor
+                  initialContent={value || initialContent}
+                  onChange={handleUpdate}
+                  onMount={(e) => {
+                    if (props.onEditorReady) {
+                      props.onEditorReady(e);
+                    }
+                  }}
+                  placeholder={placeholder}
+                  editable={editable}
+                  maxLength={props.showCharacterCount ? maxLength : undefined}
+                  className="border-none"
+                />
+              </div>
             </>
           )}
         </Card>
@@ -341,7 +328,7 @@ export function DocumentEditor({
     if (title) {
       document.title = `${title} - Lucid`;
     } else {
-      document.title = 'Untitled Document - Lucid';
+      document.title = 'New Note - Lucid';
     }
   }, [title]);
 

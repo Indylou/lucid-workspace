@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { EnhancedHeader } from '../components/dashboard/EnhancedHeader';
 import { EnhancedRichTextEditor } from '../components/tiptap/enhanced-rich-text-editor';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
@@ -240,9 +239,7 @@ export default function DocumentEditorPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col document-editor">
-      <EnhancedHeader />
-      
+    <div className="min-h-screen bg-background flex flex-col document-editor">      
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className={`sidebar border-r transition-all duration-300 flex flex-col ${sidebarCollapsed ? 'w-10' : 'w-64'}`}>
@@ -397,27 +394,25 @@ export default function DocumentEditorPage() {
               
               {/* Document content editor */}
               <div className="flex-1 overflow-auto">
-                <div className="editor-content max-w-4xl mx-auto p-4">
-                  <div className="tiptap-editor">
-                    <EnhancedRichTextEditor
-                      value={editableContent}
-                      onChange={handleContentChange}
-                      showToolbar={false} // Hide default toolbar since we have our custom one
-                      previewMode={false}
-                      placeholder="Start writing..."
-                      className="min-h-full"
-                    />
-                  </div>
+                <div className="tiptap-editor">
+                  <EnhancedRichTextEditor
+                    value={editableContent}
+                    onChange={handleContentChange}
+                    showToolbar={false} // Hide default toolbar since we have our custom one
+                    previewMode={false}
+                    placeholder="Start writing..."
+                    className="min-h-full"
+                  />
                 </div>
               </div>
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full">
-              <h2 className="text-2xl font-bold mb-4">No Document Selected</h2>
-              <p className="text-muted-foreground mb-4">Select a document from the sidebar or create a new one.</p>
+              <h2 className="text-2xl font-bold mb-4">no note selected</h2>
+              <p className="text-muted-foreground mb-4">Select note from the sidebar or create a new one.</p>
               <Button onClick={handleNewDocument}>
                 <Plus size={16} className="mr-2" />
-                Create New Document
+                create new note...
               </Button>
             </div>
           )}

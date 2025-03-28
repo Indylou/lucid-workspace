@@ -92,7 +92,7 @@ export function UserSelector({ onSelect, currentUserId }: UserSelectorProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="text-xs font-medium text-muted-foreground px-2 py-1.5">
-          Assign to user
+          Assign to...
         </div>
         
         {/* Current user */}
@@ -162,7 +162,7 @@ export function UserSelector({ onSelect, currentUserId }: UserSelectorProps) {
         
         {fetchingRef.current && (
           <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-            Loading users...
+            Loading...
           </div>
         )}
       </DropdownMenuContent>

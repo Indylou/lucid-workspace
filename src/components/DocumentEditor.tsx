@@ -459,48 +459,18 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
 
   return (
     <div className="document-editor">
-      {/* Note header */}
-      <div className="document-header">
-        <div className="flex items-center">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate('/documents')}
-            className="mr-2 rounded-lg"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            {/* Synced title display - now editable */}
-            <input
-              type="text"
-              value={title}
-              onChange={handleTitleChange}
-              className="text-lg font-medium bg-transparent border-none outline-none w-full hover:bg-gray-100 focus:bg-gray-100 px-2 py-1 rounded transition-colors"
-              placeholder="Enter document title"
-            />
-            <div className="text-xs text-muted-foreground">
-              Document title
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => handleSave()}
-            disabled={saving}
-            className="text-sm"
-          >
-            {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
-            Save
-          </Button>
-        </div>
-      </div>
-      
       {/* Document formatting toolbar */}
       <div className="format-toolbar-container">
         <div className="format-toolbar">
           <div className="toolbar-button-group">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate('/documents')}
+              className="mr-2 rounded-md"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
             <Button 
               variant="ghost" 
               size="icon" 
@@ -618,10 +588,32 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({ documentId }) =>
             >
               <Redo className="h-4 w-4" />
             </Button>
+            <Button 
+              variant="ghost" 
+              onClick={() => handleSave()}
+              disabled={saving}
+              className="format-button" 
+            >
+              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+            </Button>
           </div>
         </div>
       </div>
-
+      {/* Note header */}
+      <div className="document-header">
+        <div className="flex items-center">
+          <div>
+            {/* Synced title display - now editable */}
+            <input
+              type="text"
+              value={title}
+              onChange={handleTitleChange}
+              className="text-md font-medium bg-transparent border-none outline-none"
+              placeholder="note title..."
+            />
+          </div>
+        </div>
+      </div>
       {/* Editor content area */}
       <div className="editor-content-container h-[calc(100vh-120px)]">
         <div className="editor-content">

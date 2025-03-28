@@ -23,13 +23,11 @@
 
 /* Document title bar at the top */
 .document-header {
-  background-color: hsl(var(--background));
-  border-bottom: 1px solid hsl(var(--border));
-  padding: 0.75rem 1.5rem;
+  background-color: transparent;
+  padding: 0.75rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  justify-content: center;
   z-index: 10;
   flex-shrink: 0;
 }
@@ -74,7 +72,7 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.25rem 1.5rem;
   margin: 0;
   box-shadow: 0 1px 3px hsla(var(--foreground) / 0.02);
 }
@@ -84,7 +82,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.5rem;
+  padding: 0.25rem;
   background-color: hsla(var(--card) / 0.3);
   border-radius: 0.5rem;
   transition: all 0.2s ease;
@@ -128,11 +126,10 @@
 .editor-content-container {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
   position: relative;
   display: flex;
   min-height: 0; /* Important for Firefox flex container */
-  height: calc(100vh - 120px); /* Ensure it takes up most of the viewport height */
+  height: calc(100vh - 100px); /* Ensure it takes up most of the viewport height */
 }
 
 /* Editor content with glass effect */
@@ -164,12 +161,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    135deg,
-    hsla(var(--purple-light) / 0.1) 0%,
-    transparent 50%,
-    hsla(var(--purple-medium) / 0.08) 100%
-  );
+  background: hsla(var(--purple-light) / 0.1);
   pointer-events: none;
   z-index: 0;
   border-radius: inherit;
@@ -188,7 +180,6 @@
   flex-direction: column;
   height: 100%;
   flex: 1;
-  min-height: 70vh; /* Ensure Card is at least 70% of viewport height */
 }
 
 /* Ensure card content fills remaining height */
@@ -196,7 +187,6 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 65vh; /* Ensure CardContent is at least 65% of viewport height */
 }
 
 /* Fix glass effect editor inside rich text editor */
